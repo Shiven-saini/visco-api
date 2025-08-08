@@ -1,0 +1,53 @@
+from pydantic import BaseModel, EmailStr
+from typing import Optional
+from datetime import datetime
+
+# User registration schema
+class UserCreate(BaseModel):
+    username: str
+    email: EmailStr
+    password: str
+    first_name: str
+    last_name: str
+
+# User login schema
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+# User update schema
+class UserUpdate(BaseModel):
+    email: Optional[EmailStr] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    password: Optional[str] = None
+
+# User response schema
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    email: str
+    first_name: str
+    last_name: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+# Token schema
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    expires_in: int
+
+# Standard API response schemas
+class SuccessResponse(BaseModel):
+    success: bool = True
+    message: str
+    data: Optional[dict] = None
+
+class ErrorResponse(BaseModel):
+    success: bool = False
+    message: str
+    error_code: Optional[str] = None
