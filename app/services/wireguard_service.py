@@ -83,7 +83,8 @@ Address = {wg_config.allocated_ip}
 PublicKey = {settings.wg_server_public_key}
 Endpoint = {settings.wg_server_endpoint}
 AllowedIPs = {settings.wg_server_allowed_ips}
-PersistentKeepalive = {settings.wg_persistent_keepalive}"""
+PersistentKeepalive = {settings.wg_persistent_keepalive}
+"""
         
         return config_content
     
@@ -92,6 +93,7 @@ PersistentKeepalive = {settings.wg_persistent_keepalive}"""
         peer_config = f"""
 [Peer]
 PublicKey = {wg_config.public_key}
-AllowedIPs = {wg_config.allocated_ip}"""
+AllowedIPs = {wg_config.allocated_ip}
+"""
         
         return peer_config
