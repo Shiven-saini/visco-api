@@ -51,3 +51,32 @@ class ErrorResponse(BaseModel):
     success: bool = False
     message: str
     error_code: Optional[str] = None
+
+# WireGuard Schemas
+class WireGuardConfigCreate(BaseModel):
+    username: Optional[str] = None  # For admin use
+
+class WireGuardConfigResponse(BaseModel):
+    id: int
+    user_id: int
+    username: str
+    public_key: str
+    allocated_ip: str
+    status: str
+    created_at: datetime
+    expires_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+
+class WireGuardClientConfig(BaseModel):
+    config_content: str
+    allocated_ip: str
+    public_key: str
+    expires_at: Optional[datetime] = None
+
+class WireGuardServerStatus(BaseModel):
+    interface_up: bool
+    active_peers: int
+    available_ips: int
+    total_configs: int
