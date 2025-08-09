@@ -54,6 +54,7 @@ case "$1" in
         
         TEMP_FILE="$2"
         
+        # Verify temporary file exists and is readable
         if [ ! -f "$TEMP_FILE" ]; then
             log_message "ERROR: Temporary file '$TEMP_FILE' does not exist"
             echo "Error: Temporary file '$TEMP_FILE' does not exist"
@@ -66,18 +67,21 @@ case "$1" in
             exit 1
         fi
         
+        # Verify WireGuard config file exists
         if [ ! -f "$WG_CONFIG_FILE" ]; then
             log_message "ERROR: WireGuard config file '$WG_CONFIG_FILE' does not exist"
             echo "Error: WireGuard config file '$WG_CONFIG_FILE' does not exist"
             exit 1
         fi
         
+        # Check if config file is writable
         if [ ! -w "$WG_CONFIG_FILE" ]; then
             log_message "ERROR: Cannot write to WireGuard config file '$WG_CONFIG_FILE'"
             echo "Error: Cannot write to WireGuard config file '$WG_CONFIG_FILE'"
             exit 1
         fi
         
+        # Append peer configuration from temp file
         if cat "$TEMP_FILE" >> "$WG_CONFIG_FILE"; then
             log_message "SUCCESS: Peer added to WireGuard configuration from '$TEMP_FILE'"
             echo "Peer added to WireGuard configuration"
@@ -121,25 +125,71 @@ case "$1" in
         TEMP_CONFIG="$TEMP_DIR/wg0_temp_$(date +%Y%m%d_%H%M%S).conf"
         log_message "INFO: Creating temporary config file: $TEMP_CONFIG"
         
-        # Process the config file and exclude the peer with matching public key
-        if awk -v pubkey="$PUBLIC_KEY" '
-        BEGIN { skip = 0 }
-        /^\[Peer\]/ { 
-            peer_start = NR
-            getline line
-            if (line ~ "^PublicKey = " pubkey "$") {
-                skip = 1
-                next
-            } else {
-                print "[Peer]"
-                print line
-                skip = 0
+        # Improved awk logic that properly handles peer blocks
+        if awk -v target_pubkey="$PUBLIC_KEY" '
+        BEGIN { 
+            in_peer_block = 0
+            current_peer_pubkey = ""
+            skip_current_peer = 0
+            peer_lines = ""
+        }
+        
+        # Start of Interface section
+        /^\[Interface\]/ {
+            in_peer_block = 0
+            skip_current_peer = 0
+            print
+            next
+        }
+        
+        # Start of Peer section
+        /^\[Peer\]/ {
+            # If we were in a previous peer block, output it if not skipping
+            if (in_peer_block && !skip_current_peer && peer_lines != "") {
+                print peer_lines
+            }
+            
+            # Reset for new peer block
+            in_peer_block = 1
+            current_peer_pubkey = ""
+            skip_current_peer = 0
+            peer_lines = "[Peer]"
+            next
+        }
+        
+        # Inside a peer block
+        in_peer_block == 1 {
+            # Look for PublicKey line
+            if (/^PublicKey = /) {
+                current_peer_pubkey = $3  # Extract the public key
+                if (current_peer_pubkey == target_pubkey) {
+                    skip_current_peer = 1
+                }
+            }
+            
+            # Add line to current peer block (unless we are skipping)
+            if (!skip_current_peer) {
+                if (peer_lines == "[Peer]") {
+                    peer_lines = peer_lines "\n" $0
+                } else {
+                    peer_lines = peer_lines "\n" $0
+                }
+            }
+            next
+        }
+        
+        # Lines outside peer blocks (like in Interface section)
+        in_peer_block == 0 {
+            print
+            next
+        }
+        
+        # End of file - output last peer if not skipping
+        END {
+            if (in_peer_block && !skip_current_peer && peer_lines != "") {
+                print peer_lines
             }
         }
-        /^\[Interface\]/ { skip = 0; print; next }
-        /^\[Peer\]/ && skip == 0 { print; next }
-        skip == 0 { print }
-        /^$/ && skip == 1 { skip = 0 }
         ' "$WG_CONFIG_FILE" > "$TEMP_CONFIG"; then
             
             # Replace original with filtered version
