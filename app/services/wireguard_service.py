@@ -90,10 +90,6 @@ PersistentKeepalive = {settings.wg_persistent_keepalive}
     
     def generate_server_peer_config(self, wg_config: WireGuardConfig) -> str:
         """Generate the server-side peer configuration for wg0.conf."""
-        peer_config = f"""
-[Peer]
-PublicKey = {wg_config.public_key}
-AllowedIPs = {wg_config.allocated_ip}
-"""
+        peer_config = f"\n[Peer]\nPublicKey = {wg_config.public_key}\nAllowedIPs = {wg_config.allocated_ip}\n"
         
         return peer_config

@@ -35,6 +35,37 @@ get_temp_dir() {
     return 1
 }
 
+# Function to clean up excess blank lines in config
+cleanup_config() {
+    local config_file="$1"
+    local temp_file="$2"
+    
+    # Remove excessive blank lines while preserving single blank lines between sections
+    awk '
+    BEGIN { blank_count = 0 }
+    /^$/ { 
+        blank_count++
+        if (blank_count <= 1) {
+            blank_lines[blank_count] = $0
+        }
+        next
+    }
+    /./ {
+        # Print accumulated blank lines (max 1)
+        if (blank_count > 0) {
+            if (blank_count == 1) {
+                print ""
+            }
+            blank_count = 0
+        }
+        print
+    }
+    END {
+        # Don'\''t add trailing blank lines
+    }
+    ' "$config_file" > "$temp_file"
+}
+
 # Logging function
 log_message() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
@@ -81,8 +112,16 @@ case "$1" in
             exit 1
         fi
         
+        # Get temp directory for cleanup
+        TEMP_DIR=$(get_temp_dir "$3")
+        CLEANUP_TEMP="$TEMP_DIR/wg_cleanup_$(date +%Y%m%d_%H%M%S).conf"
+        
         # Append peer configuration from temp file
         if cat "$TEMP_FILE" >> "$WG_CONFIG_FILE"; then
+            # Clean up excess blank lines after addition
+            cleanup_config "$WG_CONFIG_FILE" "$CLEANUP_TEMP"
+            mv "$CLEANUP_TEMP" "$WG_CONFIG_FILE"
+            
             log_message "SUCCESS: Peer added to WireGuard configuration from '$TEMP_FILE'"
             echo "Peer added to WireGuard configuration"
             exit 0
@@ -123,9 +162,10 @@ case "$1" in
         
         # Create temporary file for filtered config using dynamic temp directory
         TEMP_CONFIG="$TEMP_DIR/wg0_temp_$(date +%Y%m%d_%H%M%S).conf"
+        CLEANUP_TEMP="$TEMP_DIR/wg_cleanup_$(date +%Y%m%d_%H%M%S).conf"
         log_message "INFO: Creating temporary config file: $TEMP_CONFIG"
         
-        # Improved awk logic that properly handles peer blocks
+        # Improved awk logic that properly handles peer blocks and removes excess whitespace
         if awk -v target_pubkey="$PUBLIC_KEY" '
         BEGIN { 
             in_peer_block = 0
@@ -136,6 +176,10 @@ case "$1" in
         
         # Start of Interface section
         /^\[Interface\]/ {
+            # Output any pending peer block
+            if (in_peer_block && !skip_current_peer && peer_lines != "") {
+                print peer_lines
+            }
             in_peer_block = 0
             skip_current_peer = 0
             print
@@ -159,6 +203,11 @@ case "$1" in
         
         # Inside a peer block
         in_peer_block == 1 {
+            # Skip empty lines within peer blocks for cleaner output
+            if (/^$/) {
+                next
+            }
+            
             # Look for PublicKey line
             if (/^PublicKey = /) {
                 current_peer_pubkey = $3  # Extract the public key
@@ -169,17 +218,17 @@ case "$1" in
             
             # Add line to current peer block (unless we are skipping)
             if (!skip_current_peer) {
-                if (peer_lines == "[Peer]") {
-                    peer_lines = peer_lines "\n" $0
-                } else {
-                    peer_lines = peer_lines "\n" $0
-                }
+                peer_lines = peer_lines "\n" $0
             }
             next
         }
         
         # Lines outside peer blocks (like in Interface section)
         in_peer_block == 0 {
+            # Skip excessive blank lines
+            if (/^$/) {
+                next
+            }
             print
             next
         }
@@ -192,8 +241,14 @@ case "$1" in
         }
         ' "$WG_CONFIG_FILE" > "$TEMP_CONFIG"; then
             
-            # Replace original with filtered version
-            if mv "$TEMP_CONFIG" "$WG_CONFIG_FILE"; then
+            # Clean up excess blank lines in the filtered config
+            cleanup_config "$TEMP_CONFIG" "$CLEANUP_TEMP"
+            
+            # Replace original with cleaned version
+            if mv "$CLEANUP_TEMP" "$WG_CONFIG_FILE"; then
+                # Clean up temp files
+                rm -f "$TEMP_CONFIG"
+                
                 log_message "SUCCESS: Peer with public key '$PUBLIC_KEY' removed from WireGuard configuration"
                 echo "Peer removed from WireGuard configuration"
                 exit 0
@@ -205,13 +260,13 @@ case "$1" in
                     cp "$BACKUP_FILE" "$WG_CONFIG_FILE"
                     log_message "INFO: Config file restored from backup"
                 fi
-                rm -f "$TEMP_CONFIG"
+                rm -f "$TEMP_CONFIG" "$CLEANUP_TEMP"
                 exit 1
             fi
         else
             log_message "ERROR: Failed to process config file - awk command failed"
             echo "Error: Failed to process config file"
-            rm -f "$TEMP_CONFIG"
+            rm -f "$TEMP_CONFIG" "$CLEANUP_TEMP"
             exit 1
         fi
         ;;
