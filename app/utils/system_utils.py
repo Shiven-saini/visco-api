@@ -6,24 +6,19 @@ from ..config.settings import settings
 
 def get_temp_dir() -> str:
     """Get the best available temporary directory with space."""
-    # Try directories in order of preference
     temp_dirs = ["/var/tmp", "/tmp", "/home/ec2-user/tmp"]
     
     for temp_dir in temp_dirs:
         try:
-            # Ensure directory exists
             os.makedirs(temp_dir, mode=0o755, exist_ok=True)
-            
-            # Check if we have write permission and space
             statvfs = os.statvfs(temp_dir)
             available_mb = (statvfs.f_bavail * statvfs.f_frsize) / (1024 * 1024)
             
-            if available_mb >= 10:  # At least 10MB available
+            if available_mb >= 10:
                 return temp_dir
         except (OSError, PermissionError):
             continue
     
-    # Fallback to system temp
     return tempfile.gettempdir()
 
 def check_disk_space(path: str = "/tmp", min_mb: int = 10) -> bool:
@@ -41,22 +36,17 @@ def append_peer_to_wg_config(peer_config: str) -> bool:
     Returns True if successful, False otherwise.
     """
     try:
-        # Get the best temporary directory
         temp_dir = get_temp_dir()
         
-        # Check disk space in chosen temp directory
         if not check_disk_space(temp_dir, 10):
             print(f"Error: Insufficient disk space in {temp_dir}")
             return False
         
-        # Ensure WireGuard directory exists
         wg_dir = os.path.dirname(settings.wg_config_file)
         if not os.path.exists(wg_dir):
             os.makedirs(wg_dir, mode=0o700, exist_ok=True)
         
         script_path = settings.wg_update_script_path
-        
-        # Use the selected temp directory
         temp_file = os.path.join(temp_dir, "wg_peer_add.conf")
         
         try:
@@ -67,12 +57,11 @@ def append_peer_to_wg_config(peer_config: str) -> bool:
             print(f"Error writing temporary file: {e}")
             return False
         
-        # Call the update script
+        # Pass the temp directory to the script
         result = subprocess.run([
-            "sudo", script_path, "add", temp_file
+            "sudo", script_path, "add", temp_file, temp_dir
         ], capture_output=True, text=True, timeout=30)
         
-        # Clean up temp file
         if os.path.exists(temp_file):
             try:
                 os.remove(temp_file)
@@ -104,8 +93,9 @@ def remove_peer_from_wg_config(public_key: str) -> bool:
         
         script_path = settings.wg_update_script_path
         
+        # Pass the temp directory and public key to the script
         result = subprocess.run([
-            "sudo", script_path, "remove", public_key
+            "sudo", script_path, "remove", public_key, temp_dir
         ], capture_output=True, text=True, timeout=30)
         
         if result.returncode != 0:

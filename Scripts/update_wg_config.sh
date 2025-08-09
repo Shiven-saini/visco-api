@@ -1,10 +1,39 @@
 #!/bin/bash
 # WireGuard configuration update script
-# Usage: update_wg_config.sh {add|remove} {temp_file|public_key}
+# Usage: update_wg_config.sh {add|remove} {temp_file|public_key} [temp_dir]
 
 WG_CONFIG_FILE="/etc/wireguard/wg0.conf"
 BACKUP_DIR="/etc/wireguard/backup"
 LOG_FILE="/var/log/wireguard_updates.log"
+
+# Function to get best temp directory
+get_temp_dir() {
+    local preferred_temp="$1"
+    local temp_dirs=("$preferred_temp" "/var/tmp" "/tmp" "/home/ec2-user/tmp")
+    
+    for temp_dir in "${temp_dirs[@]}"; do
+        if [ -z "$temp_dir" ]; then
+            continue
+        fi
+        
+        # Create directory if it doesn't exist
+        mkdir -p "$temp_dir" 2>/dev/null
+        
+        # Check if directory is writable and has space
+        if [ -w "$temp_dir" ]; then
+            # Simple space check - try to create a small test file
+            if echo "test" > "$temp_dir/wg_space_test" 2>/dev/null; then
+                rm -f "$temp_dir/wg_space_test"
+                echo "$temp_dir"
+                return 0
+            fi
+        fi
+    done
+    
+    # Fallback
+    echo "/tmp"
+    return 1
+}
 
 # Logging function
 log_message() {
@@ -13,8 +42,6 @@ log_message() {
 
 # Ensure backup directory exists
 mkdir -p "$BACKUP_DIR"
-
-# Ensure log file exists
 touch "$LOG_FILE"
 
 case "$1" in
@@ -27,7 +54,6 @@ case "$1" in
         
         TEMP_FILE="$2"
         
-        # Verify temporary file exists and is readable
         if [ ! -f "$TEMP_FILE" ]; then
             log_message "ERROR: Temporary file '$TEMP_FILE' does not exist"
             echo "Error: Temporary file '$TEMP_FILE' does not exist"
@@ -40,21 +66,18 @@ case "$1" in
             exit 1
         fi
         
-        # Verify WireGuard config file exists
         if [ ! -f "$WG_CONFIG_FILE" ]; then
             log_message "ERROR: WireGuard config file '$WG_CONFIG_FILE' does not exist"
             echo "Error: WireGuard config file '$WG_CONFIG_FILE' does not exist"
             exit 1
         fi
         
-        # Check if config file is writable
         if [ ! -w "$WG_CONFIG_FILE" ]; then
             log_message "ERROR: Cannot write to WireGuard config file '$WG_CONFIG_FILE'"
             echo "Error: Cannot write to WireGuard config file '$WG_CONFIG_FILE'"
             exit 1
         fi
         
-        # Append peer configuration from temp file
         if cat "$TEMP_FILE" >> "$WG_CONFIG_FILE"; then
             log_message "SUCCESS: Peer added to WireGuard configuration from '$TEMP_FILE'"
             echo "Peer added to WireGuard configuration"
@@ -74,8 +97,12 @@ case "$1" in
         fi
         
         PUBLIC_KEY="$2"
+        PREFERRED_TEMP_DIR="$3"  # Third argument is preferred temp directory
         
-        # Verify WireGuard config file exists
+        # Get the best temp directory
+        TEMP_DIR=$(get_temp_dir "$PREFERRED_TEMP_DIR")
+        log_message "INFO: Using temp directory: $TEMP_DIR"
+        
         if [ ! -f "$WG_CONFIG_FILE" ]; then
             log_message "ERROR: WireGuard config file '$WG_CONFIG_FILE' does not exist"
             echo "Error: WireGuard config file '$WG_CONFIG_FILE' does not exist"
@@ -90,8 +117,9 @@ case "$1" in
             log_message "INFO: Backup created at '$BACKUP_FILE'"
         fi
         
-        # Create temporary file for filtered config
-        TEMP_CONFIG="/tmp/wg0_temp_$(date +%Y%m%d_%H%M%S).conf"
+        # Create temporary file for filtered config using dynamic temp directory
+        TEMP_CONFIG="$TEMP_DIR/wg0_temp_$(date +%Y%m%d_%H%M%S).conf"
+        log_message "INFO: Creating temporary config file: $TEMP_CONFIG"
         
         # Process the config file and exclude the peer with matching public key
         if awk -v pubkey="$PUBLIC_KEY" '
@@ -127,10 +155,11 @@ case "$1" in
                     cp "$BACKUP_FILE" "$WG_CONFIG_FILE"
                     log_message "INFO: Config file restored from backup"
                 fi
+                rm -f "$TEMP_CONFIG"
                 exit 1
             fi
         else
-            log_message "ERROR: Failed to process config file"
+            log_message "ERROR: Failed to process config file - awk command failed"
             echo "Error: Failed to process config file"
             rm -f "$TEMP_CONFIG"
             exit 1
@@ -138,7 +167,7 @@ case "$1" in
         ;;
         
     *)
-        echo "Usage: $0 {add|remove} {temp_file|public_key}"
+        echo "Usage: $0 {add|remove} {temp_file|public_key} [temp_dir]"
         log_message "ERROR: Invalid usage - $*"
         exit 1
         ;;
