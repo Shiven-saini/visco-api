@@ -1,17 +1,21 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Form
+from fastapi import APIRouter, Depends, HTTPException, status, Form, Request
 from sqlalchemy.orm import Session
 from datetime import timedelta, datetime
 from pydantic import EmailStr
 from ..database import get_db
 from ..schemas import UserLogin, UserCreate, Token, SuccessResponse, UserResponse
-from ..auth import authenticate_user, create_access_token, ACCESS_TOKEN_EXPIRE_DAYS
+from ..auth import authenticate_user, create_access_token, ACCESS_TOKEN_EXPIRE_DAYS, pwd_context
 from .. import models
 
 import random
 
 from ..utils.otp_utils import send_email_otp_for_verification
+from ..utils.token_utils import get_client_ip
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 # @router.post("/login", response_model=Token)
 # def login_user(user_credentials: UserLogin, db: Session = Depends(get_db)):
@@ -112,6 +116,68 @@ async def register(
 
     db.commit()
     return {"msg": "Admin registered and organization created successfully."}
+
+@router.post("/login")
+async def login_user(
+    request: Request,
+    email: EmailStr = Form(...),
+    password: str = Form(...),
+    db: Session = Depends(get_db),
+):  
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="This User Is Not Available")
+
+    if not pwd_context.verify(password, user.password_hash):
+        raise HTTPException(status_code=400, detail="Invalid email or password")
+
+    #  Get client's IP
+    client_ip = get_client_ip()
+    ip_record = db.query(models.IPAddress).filter(models.IPAddress.user_id == user.id).first()
+    if ip_record:
+        ip_record.ip_address = client_ip
+        ip_record.last_login = datetime.utcnow()
+    else:
+        ip_record = models.IPAddress(
+            user_id=user.id,
+            ip_address=client_ip,
+            last_login=datetime.utcnow()
+        )
+        db.add(ip_record)
+
+    db.commit()
+
+    # ✅ Fetch the latest IP record from DB (so we return stored values)
+    ip_record = db.query(models.IPAddress).filter(models.IPAddress.user_id == user.id).first()
+
+    # ✅ Generate JWT token
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    token = create_access_token(
+        data={
+            "sub": str(user.id),
+            "type": str(user.role.name),
+            "email": user.email,
+            "org_id": user.org_id
+        },
+        expires_delta=access_token_expires
+    )
+
+    return {
+        "message": "Login successful",
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "role": user.role.name,
+            "account_created_date": user.created_at,
+        },
+        "ip_address": ip_record.ip_address,
+        "last_login": ip_record.last_login
+    }
+
+
 
 @router.post("/send-otp-account-verification")
 async def send_otp_verification_account(
