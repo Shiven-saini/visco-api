@@ -21,6 +21,23 @@ app = FastAPI(
     redoc_url="/redoc"  # ReDoc
 )
 
+#########
+#Add CORS Middleware later on 
+
+# origins = [
+#     "*"  # Add any other domains
+# ]
+
+# # Add CORS middleware
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=origins,
+#     allow_credentials=True,
+#     allow_methods=["*"], 
+#     allow_headers=["*"],  # Allows all headers
+# )
+####
+
 # Include routers
 app.include_router(auth_routes.router)
 app.include_router(user_routes.router)
@@ -31,14 +48,14 @@ async def startup_event():
     try:
         # Test database connection
         with engine.connect() as conn:
-            logger.info("✅ Database connection successful")
+            logger.info("Database connection successful")
         
         # Create tables
         models.Base.metadata.create_all(bind=engine)
-        logger.info("✅ Database tables created/verified")
+        logger.info("Database tables created/verified")
         
     except OperationalError as e:
-        logger.error(f"❌ Database connection failed: {e}")
+        logger.error(f"Database connection failed: {e}")
         logger.error("Please ensure PostgreSQL is running and database 'visco' exists")
         raise HTTPException(
             status_code=500, 
