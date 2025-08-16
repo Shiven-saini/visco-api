@@ -116,6 +116,29 @@ async def send_otp_verification_account(
     else:
         raise HTTPException(status_code=500, detail=result.get("message", "Failed to send OTP"))
 
+@router.post("/verify-your-account")
+async def verify_your_account(
+    email: EmailStr = Form(...),
+    otp: int = Form(...),
+    db: Session = Depends(get_db)
+):
+    otp_record = db.query(models.Verify_otp).filter(
+        models. Verify_otp.email == email,
+        models.Verify_otp.otp == otp
+    ).first()
+
+    if not otp_record:
+        raise HTTPException(status_code=400, detail="Incorrect OTP.")
+
+    if otp_record.expires_at < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="OTP has expired. Please request a new one.")
+
+    # Optional: Mark this email as verified or just allow sign-up now
+    db.delete(otp_record)
+    db.commit()
+
+    return {"message": "OTP verified successfully. You can now proceed to sign up."}
+
 
 
 @router.post("/login", response_model=Token)
