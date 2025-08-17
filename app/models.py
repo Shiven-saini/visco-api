@@ -36,6 +36,18 @@ class User(Base):
     role = relationship("Role")
     org = relationship("Organization", foreign_keys=[org_id])  
 
+class Super_admin(Base):
+    __tablename__ = 'super_admin'
+    
+    id = Column(Integer, primary_key=True)
+    name = Column(String)
+    email = Column(String, unique=True, nullable=False)
+    password_hash = Column(String, nullable=False)
+    org_name = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_login = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    role = Column(String, nullable=False)
+
 
 # Role User object relational Mapping
 class Role(Base):
@@ -118,7 +130,7 @@ class Camera_details(Base):
 
 class Manage_Alert(Base):
     __tablename__ = 'manage_alert'
-    
+
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  
     rule_name = Column(String)
