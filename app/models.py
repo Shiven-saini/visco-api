@@ -96,7 +96,7 @@ class IPAddress(Base):
 
 class Camera_details(Base):
     __tablename__ = 'camera_details'
-    
+
     id = Column(Integer, primary_key=True)
     name = Column(String)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # Optional FK
@@ -112,6 +112,22 @@ class Camera_details(Base):
     resolution = Column(String, nullable=True)
     features = Column(String, nullable=True)
     last_active = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow) 
+
+
+class Manage_Alert(Base):
+    __tablename__ = 'manage_alert'
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  
+    rule_name = Column(String)
+    description = Column(String, nullable=True)
+    alert_type = Column(String, nullable=True)
+    apply_to_camera = Column(String, nullable=True)
+    servity_level = Column(String, nullable=True)
+    notification_method = Column(JSONB)
+    status = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow) 
 

@@ -92,3 +92,16 @@ class CameraConfigSchema(BaseModel):
     stream_url: str
     username: str
     password: str
+
+class ManageAlertSchema(BaseModel):
+    user_id : int
+    rule_name : str
+    description : str
+    alert_type : str
+    camera_name : str
+    servity_level : str
+    notification_method : list[str]
+    status : str
+
+class AlertStatusUpdate(BaseModel):
+    status: str    

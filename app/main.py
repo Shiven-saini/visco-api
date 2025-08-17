@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from .database import engine
 from sqlalchemy.exc import OperationalError
 from . import models
-from .routers import auth_routes, user_routes, wireguard_routes, me_routes, camera_routes
+from .routers import auth_routes, user_routes, wireguard_routes, me_routes, camera_routes, alerts_routes
 import logging
 
 # Create database tables
@@ -63,6 +63,7 @@ app.include_router(auth_routes.router)
 app.include_router(user_routes.router)
 app.include_router(me_routes.router)
 app.include_router(camera_routes.router)
+app.include_router(alerts_routes.router)
 app.include_router(wireguard_routes.router)
 
 @app.get("/")
