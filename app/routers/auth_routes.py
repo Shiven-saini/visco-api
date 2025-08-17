@@ -14,7 +14,7 @@ from ..utils.token_utils import get_client_ip
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-router = APIRouter(prefix="/auth", tags=["Authentication"])
+router = APIRouter(prefix="/auth", tags=["Authentication & Session Management"])
 
 @router.post("/register-admin")
 async def register(

@@ -14,7 +14,7 @@ from ..utils.token_utils import get_client_ip
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-router = APIRouter(prefix="/me", tags=["User Profile Details"])
+router = APIRouter(prefix="/me", tags=["Profile Detail Management"])
 
 @router.get('/profile')
 async def get_my_profile_detail(

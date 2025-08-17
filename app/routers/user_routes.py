@@ -7,7 +7,7 @@ from ..dependencies import get_current_user
 from .. import models
 from ..auth import hash_password
 
-router = APIRouter(prefix="/users", tags=["User Management"])
+router = APIRouter(prefix="/users", tags=["Users Management"])
 
 @router.post('/')
 async def admin_add_user(

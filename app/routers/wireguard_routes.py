@@ -19,7 +19,7 @@ from ..utils.system_utils import (
 from ..dependencies import get_current_user
 from .. import models
 
-router = APIRouter(prefix="/wireguard", tags=["WireGuard"])
+router = APIRouter(prefix="/wireguard", tags=["WireGuard Management"])
 
 # Initialize services
 wg_service = WireGuardService()
