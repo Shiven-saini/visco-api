@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 from datetime import timedelta, datetime
 from pydantic import EmailStr
 from ..database import get_db
-from ..schemas import UserLogin, UserCreate, Token, SuccessResponse, UserResponse, ManageAlertSchema
-from ..auth import authenticate_user, get_current_user, create_access_token, ACCESS_TOKEN_EXPIRE_DAYS, pwd_context
+from ..schemas import UserLogin, UserCreate, Token, SuccessResponse, UserResponse, ManageAlertSchema, AlertStatusUpdate
+from ..auth import get_current_user, create_access_token, ACCESS_TOKEN_EXPIRE_DAYS, pwd_context
 from .. import models
 
 import random
@@ -130,7 +130,7 @@ async def admin_update_alert(
 @router.put('/{alert_id}/status')
 async def admin_update_alert(
     alert_id: int,
-    payload: models.AlertStatusUpdate,
+    payload: AlertStatusUpdate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):

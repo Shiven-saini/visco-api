@@ -4,7 +4,7 @@ from datetime import timedelta, datetime
 from pydantic import EmailStr
 from ..database import get_db
 from ..schemas import UserLogin, UserCreate, Token, SuccessResponse, UserResponse
-from ..auth import authenticate_user, hash_password, get_current_user, create_access_token, ACCESS_TOKEN_EXPIRE_DAYS, pwd_context
+from ..auth import hash_password, get_current_user, create_access_token, ACCESS_TOKEN_EXPIRE_DAYS, pwd_context
 from .. import models
 
 import random

@@ -97,16 +97,6 @@ class ResetOtp(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-class IPAddress(Base):
-    __tablename__ = 'ip_address'
-
-    id = Column(Integer, primary_key=True, index=True)
-    ip_address = Column(String(45), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Optional FK
-    created_at = Column(DateTime, default=datetime.utcnow)
-    last_login = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-
 class Camera_details(Base):
     __tablename__ = 'camera_details'
 
