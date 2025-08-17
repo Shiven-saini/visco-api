@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from .database import engine
 from sqlalchemy.exc import OperationalError
 from . import models
-from .routers import auth_routes, user_routes, wireguard_routes
+from .routers import auth_routes, user_routes, wireguard_routes, me_routes, camera_routes
 import logging
 
 # Create database tables
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="Visco backend API",
     description="FastAPI backend with JWT authentication and PostgreSQL to connect with Visco Connect",
-    version="2.0.0",
+    version="2.1.3",
     docs_url="/docs",  # Swagger UI
     redoc_url="/redoc"  # ReDoc
 )
@@ -37,10 +37,6 @@ app = FastAPI(
 #     allow_headers=["*"],  # Allows all headers
 # )
 ####
-
-# Include routers
-app.include_router(auth_routes.router)
-app.include_router(user_routes.router)
 
 # Database initialization with error handling
 @app.on_event("startup")
@@ -65,6 +61,8 @@ async def startup_event():
 # Include routers
 app.include_router(auth_routes.router)
 app.include_router(user_routes.router)
+app.include_router(me_routes.router)
+app.include_router(camera_routes.router)
 app.include_router(wireguard_routes.router)
 
 @app.get("/")
