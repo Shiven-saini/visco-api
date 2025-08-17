@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
 from .database import Base
 
@@ -38,7 +39,7 @@ class User(Base):
 
 class Super_admin(Base):
     __tablename__ = 'super_admin'
-    
+
     id = Column(Integer, primary_key=True)
     name = Column(String)
     email = Column(String, unique=True, nullable=False)
