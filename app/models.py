@@ -73,10 +73,10 @@ class IPAddress(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     last_login = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-# ✅ Send Otp Model
+# Send Otp Model
 class ResetOtp(Base):
     __tablename__ = "otp_reset_password"
-    
+
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     otp = Column(Integer, nullable=False)
     user_id = Column(Integer, nullable=False)
@@ -84,6 +84,14 @@ class ResetOtp(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+class IPAddress(Base):
+    __tablename__ = 'ip_address'
+
+    id = Column(Integer, primary_key=True, index=True)
+    ip_address = Column(String(45), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Optional FK
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_login = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class WireGuardConfig(Base):
