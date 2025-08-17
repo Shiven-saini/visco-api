@@ -15,7 +15,7 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 30
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
@@ -43,20 +43,33 @@ def verify_token(token: str):
 def get_current_user(token: str = Depends(oauth2_scheme), db=Depends(get_db)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("sub")
+        user_id_raw = payload.get("sub")
         user_type = payload.get("type")
-        org_id = payload.get("org_id")
+        org_id_raw = payload.get("org_id")
 
-        # ✅ Check user_id and allowed roles
-        if user_id is None or user_type not in ["Admin", "Manager", "Viewer"]:
+        # Check user_id and allowed roles
+        if user_id_raw is None or user_type not in ["Admin", "Manager", "Viewer"]:
             raise HTTPException(status_code=401, detail="Invalid token or role")
 
-        # ✅ Fetch user from DB
+        # Ensure numeric types for DB query comparisons (Postgres needs int for integer columns)
+        try:
+            user_id = int(user_id_raw)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=401, detail="Invalid token user id")
+
+        org_id = None
+        if org_id_raw is not None:
+            try:
+                org_id = int(org_id_raw)
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=401, detail="Invalid token org id")
+
+        # Fetch user from DB
         user = db.query(models.User).filter(models.User.id == user_id).first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
-        # ✅ Check organization match
+        # Check organization match
         if org_id is None or user.org_id != org_id:
             raise HTTPException(status_code=403, detail="Organization mismatch")
 
@@ -67,11 +80,16 @@ def get_current_user(token: str = Depends(oauth2_scheme), db=Depends(get_db)):
 def get_current_super_admin(token: str = Depends(oauth2_scheme), db=Depends(get_db)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("sub")
+        user_id_raw = payload.get("sub")
         user_type = payload.get("type")
 
-        if user_id is None or user_type != "SuperAdmin":
+        if user_id_raw is None or user_type != "SuperAdmin":
             raise HTTPException(status_code=401, detail="Invalid token for Super Admin")
+
+        try:
+            user_id = int(user_id_raw)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=401, detail="Invalid token user id")
 
         sadmin = db.query(models.Super_admin).filter(models.Super_admin.id == user_id).first()
         if not sadmin:

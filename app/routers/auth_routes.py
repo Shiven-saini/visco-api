@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Form, Request
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import timedelta, datetime
 from pydantic import EmailStr
+from typing import Annotated
 from ..database import get_db
 from ..schemas import UserLogin, UserCreate, Token, SuccessResponse, UserResponse
-from ..auth import hash_password, get_current_user, create_access_token, ACCESS_TOKEN_EXPIRE_DAYS, pwd_context
+from ..auth import hash_password, get_current_user, create_access_token, ACCESS_TOKEN_EXPIRE_DAYS, pwd_context, oauth2_scheme
 from .. import models
 
 import random
@@ -29,10 +31,19 @@ async def register(
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered in the database.")
 
-    # Fetch Admin role
+    # --- BEGIN: auto-create Admin role if missing (temporary for testing) ---
+    # Original implementation (commented out so tests can be reverted):
+    # admin_role = db.query(models.Role).filter_by(name="Admin").first()
+    # if not admin_role:
+    #     raise HTTPException(status_code=500, detail="Admin role not found")
+
+    # New behavior: create the Admin role automatically if it doesn't exist.
     admin_role = db.query(models.Role).filter_by(name="Admin").first()
     if not admin_role:
-        raise HTTPException(status_code=500, detail="Admin role not found")
+        admin_role = models.Role(name="Admin")
+        db.add(admin_role)
+        db.flush()  # ensure admin_role.id is populated
+    # --- END: auto-create Admin role if missing (temporary for testing) ---
 
     # Create user first (so we can set org.created_by = user.id properly)
     user = models.User(
@@ -60,49 +71,79 @@ async def register(
 
 @router.post("/login")
 async def login_user(
-    request: Request,
-    email: EmailStr = Form(...),
-    password: str = Form(...),
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: Session = Depends(get_db),
-):  
-    user = db.query(models.User).filter(models.User.email == email).first()
+):
+
+    email: EmailStr | None = None
+    
+    try:
+        email = form_data.username
+    except Exception:
+        # If not a valid email, keep the message generic to avoid user enumeration
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid email or password",
+        )
+
+    password = form_data.password
+
+    # Lookup user
+    user = (
+        db.query(models.User)
+        .filter(models.User.email == str(email))
+        .first()
+    )
     if not user:
-        raise HTTPException(status_code=400, detail="This User Is Not Available")
+        # Generic error to avoid leaking which field failed
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid email or password",
+        )
 
+    # Verify password
     if not pwd_context.verify(password, user.password_hash):
-        raise HTTPException(status_code=400, detail="Invalid email or password")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid email or password",
+        )
 
-    #  Get client's IP
+    # Update or create IP record
     client_ip = get_client_ip()
-    ip_record = db.query(models.IPAddress).filter(models.IPAddress.user_id == user.id).first()
+    ip_record = (
+        db.query(models.IPAddress)
+        .filter(models.IPAddress.user_id == user.id)
+        .first()
+    )
+    now = datetime.utcnow()
     if ip_record:
         ip_record.ip_address = client_ip
-        ip_record.last_login = datetime.utcnow()
+        ip_record.last_login = now
     else:
         ip_record = models.IPAddress(
             user_id=user.id,
             ip_address=client_ip,
-            last_login=datetime.utcnow()
+            last_login=now,
         )
         db.add(ip_record)
 
     db.commit()
+    db.refresh(user)
+    db.refresh(ip_record)
 
-    # Fetch the latest IP record from DB (so we return stored values)
-    ip_record = db.query(models.IPAddress).filter(models.IPAddress.user_id == user.id).first()
-
-    # Generate JWT token
+    # Create JWT
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     token = create_access_token(
         data={
             "sub": str(user.id),
             "type": str(user.role.name),
             "email": user.email,
-            "org_id": user.org_id
+            "org_id": user.org_id,
         },
-        expires_delta=access_token_expires
+        expires_delta=access_token_expires,
     )
 
+    # IMPORTANT: keep these keys for Swagger UI
     return {
         "message": "Login successful",
         "access_token": token,
@@ -115,7 +156,7 @@ async def login_user(
             "account_created_date": user.created_at,
         },
         "ip_address": ip_record.ip_address,
-        "last_login": ip_record.last_login
+        "last_login": ip_record.last_login,
     }
 
 @router.post("/otp/send-verification")

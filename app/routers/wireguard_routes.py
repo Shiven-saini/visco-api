@@ -16,7 +16,7 @@ from ..utils.system_utils import (
     remove_peer_from_wg_config,
     get_wg_config_status
 )
-from ..dependencies import get_current_user
+from ..auth import get_current_user
 from .. import models
 
 router = APIRouter(prefix="/wireguard", tags=["WireGuard Management"])

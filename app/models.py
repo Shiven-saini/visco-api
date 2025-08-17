@@ -35,7 +35,8 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     role = relationship("Role")
-    org = relationship("Organization", foreign_keys=[org_id])  
+    org = relationship("Organization", foreign_keys=[org_id])
+    wireguard_config = relationship("WireGuardConfig", back_populates="user", uselist=False)
 
 class Super_admin(Base):
     __tablename__ = 'super_admin'

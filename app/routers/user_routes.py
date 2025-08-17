@@ -3,9 +3,8 @@ from sqlalchemy.orm import Session
 from typing import List
 from ..database import get_db
 from ..schemas import UserResponse, UserUpdate, SuccessResponse
-from ..dependencies import get_current_user
 from .. import models
-from ..auth import hash_password
+from ..auth import hash_password, get_current_user
 
 router = APIRouter(prefix="/users", tags=["Users Management"])
 
