@@ -4,78 +4,19 @@ from datetime import timedelta, datetime
 from pydantic import EmailStr
 from ..database import get_db
 from ..schemas import UserLogin, UserCreate, Token, SuccessResponse, UserResponse
-from ..auth import authenticate_user, create_access_token, ACCESS_TOKEN_EXPIRE_DAYS, pwd_context
+from ..auth import authenticate_user, get_current_user, create_access_token, ACCESS_TOKEN_EXPIRE_DAYS, pwd_context
 from .. import models
 
 import random
 
-from ..utils.otp_utils import send_email_otp_for_verification
+from ..utils.otp_utils import send_email_otp_for_verification, send_email_otp, otp_storage
 from ..utils.token_utils import get_client_ip
-
-router = APIRouter(prefix="/auth", tags=["Authentication"])
-
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-# @router.post("/login", response_model=Token)
-# def login_user(user_credentials: UserLogin, db: Session = Depends(get_db)):
-#     user = authenticate_user(db, user_credentials.username, user_credentials.password)
-    
-#     if not user:
-#         raise HTTPException(
-#             status_code=status.HTTP_401_UNAUTHORIZED,
-#             detail="Invalid username or password",
-#             headers={"WWW-Authenticate": "Bearer"},
-#         )
-    
-#     access_token_expires = timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
-#     access_token = create_access_token(
-#         data={"sub": user.username}, expires_delta=access_token_expires
-#     )
-    
-#     return {
-#         "access_token": access_token,
-#         "token_type": "bearer",
-#         "expires_in": ACCESS_TOKEN_EXPIRE_DAYS * 24 * 60 * 60  # in seconds
-#     }
+router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-# @router.post("/register", response_model=SuccessResponse, status_code=status.HTTP_201_CREATED)
-# def register_user(user: UserCreate, db: Session = Depends(get_db)):
-#     # Check if username already exists
-#     db_user = db.query(models.User).filter(models.User.username == user.username).first()
-#     if db_user:
-#         raise HTTPException(
-#             status_code=status.HTTP_400_BAD_REQUEST,
-#             detail="Username already registered"
-#         )
-    
-#     # Check if email already exists
-#     db_user = db.query(models.User).filter(models.User.email == user.email).first()
-#     if db_user:
-#         raise HTTPException(
-#             status_code=status.HTTP_400_BAD_REQUEST,
-#             detail="Email already registered"
-#         )
-    
-#     # Create new user
-#     db_user = models.User(
-#         username=user.username,
-#         email=user.email,
-#         password=user.password,  # Plain text as requested
-#         first_name=user.first_name,
-#         last_name=user.last_name
-#     )
-    
-#     db.add(db_user)
-#     db.commit()
-#     db.refresh(db_user)
-    
-#     return SuccessResponse(
-#         message="User registered successfully",
-#         data={"user_id": db_user.id, "username": db_user.username}
-#     )
-
-@router.post("/admin-register")
+@router.post("/register-admin")
 async def register(
     name: str = Form(...),
     email: str = Form(...),
@@ -177,9 +118,7 @@ async def login_user(
         "last_login": ip_record.last_login
     }
 
-
-
-@router.post("/send-otp-account-verification")
+@router.post("/otp/send-verification")
 async def send_otp_verification_account(
     email: EmailStr = Form(...),
     db: Session = Depends(get_db)
@@ -204,7 +143,7 @@ async def send_otp_verification_account(
     else:
         raise HTTPException(status_code=500, detail=result.get("message", "Failed to send OTP"))
 
-@router.post("/verify-your-account")
+@router.post("/otp/verify")
 async def verify_your_account(
     email: EmailStr = Form(...),
     otp: int = Form(...),
@@ -227,8 +166,98 @@ async def verify_your_account(
 
     return {"message": "OTP verified successfully. You can now proceed to sign up."}
 
+@router.put("/password/change", response_model=SuccessResponse)
+async def admin_change_password(
+    email: EmailStr = Form(...),
+    old_password: str = Form(...),
+    new_password: str = Form(...),
+    confirm_password: str = Form(...),
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # ✅ Ensure the user is changing their own password
+    if current_user.email != email:
+        raise HTTPException(status_code=403, detail="You can only change your own password")
 
-@router.post("/logout", response_model=SuccessResponse)
-def logout_user():
-    # Since JWT tokens are stateless, logout is handled client-side
-    return SuccessResponse(message="Logout successful. Please remove the token from client-side.")
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not pwd_context.verify(old_password, user.password_hash):
+        raise HTTPException(status_code=400, detail="Old password is incorrect")
+
+    if new_password != confirm_password:
+        raise HTTPException(status_code=400, detail="New password and confirm password do not match")
+
+    # ✅ Update the password
+    user.password_hash = pwd_context.hash(new_password)
+    db.commit()
+
+    return {"message": "Password changed successfully"}
+
+@router.post("/password/forgot/send-otp")
+async def admin_send_otp_forgot_pass(
+    email: EmailStr = Form(...),
+    db: Session = Depends(get_db)
+    ):
+    email_user = db.query(models.User).filter(models.User.email == email).first()
+    if not email_user:
+        raise HTTPException(status_code=400, detail="This User Is Not Available")
+    if email_user:
+        id_of_user=email_user.id
+        otp = str(random.randint(100000, 999999))
+
+        otp_storage[email] = otp  # Store OTP temporarily
+
+        result = send_email_otp(email, otp)
+        if result["status"] == "success":
+            otp_user = models.ResetOtp(otp=otp,user_id=id_of_user)
+            db.add(otp_user)
+            db.commit()
+            db.refresh(otp_user)
+            return {"message": "OTP sent successfully"}
+        else:
+            raise HTTPException(status_code=500, detail=result["message"])
+
+@router.put("/password/reset")
+async def reset_password(
+    otp: int = Form(...),
+    password: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    matched_otp = db.query(models.ResetOtp).filter(models.ResetOtp.otp == otp).first()
+    
+    if not matched_otp:
+        raise HTTPException(status_code=400, detail="This OTP is incorrect. Please enter the correct OTP.")
+
+    # Get the user associated with the OTP
+    user = db.query(models.User).filter(models.User.id == matched_otp.user_id).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    # Hash the new password and update the user record
+    user.password_hash = pwd_context.hash(password)
+    
+    db.commit()
+    
+    return {"message": "Your password has been changed successfully. Please log in with the new password."}
+  
+
+@router.post("/users")
+
+@router.post("/users/{camera_id}")
+
+@router.post("/alerts")
+
+@router.post("/alerts/{alert_id}")
+
+@router.post("/alerts/{alert_id}/status")
+
+@router.post("/super-admin/login")
+
+@router.post("/super-admin/admins")
+
+@router.post("/super-admin/password/forgot/send-otp")
+
+@router.post("/super-admin/password/reset")
