@@ -64,6 +64,22 @@ def get_current_user(token: str = Depends(oauth2_scheme), db=Depends(get_db)):
     except JWTError:
         raise HTTPException(status_code=403, detail="Invalid token")
 
+def get_current_super_admin(token: str = Depends(oauth2_scheme), db=Depends(get_db)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("sub")
+        user_type = payload.get("type")
+
+        if user_id is None or user_type != "SuperAdmin":
+            raise HTTPException(status_code=401, detail="Invalid token for Super Admin")
+
+        sadmin = db.query(models.Super_admin).filter(models.Super_admin.id == user_id).first()
+        if not sadmin:
+            raise HTTPException(status_code=404, detail="User not found")
+        return sadmin
+    except JWTError:
+        raise HTTPException(status_code=403, detail="Invalid token")
+
 def verify_password(plain, hashed):
     return pwd_context.verify(plain, hashed)
 

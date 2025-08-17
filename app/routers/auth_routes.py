@@ -4,7 +4,7 @@ from datetime import timedelta, datetime
 from pydantic import EmailStr
 from ..database import get_db
 from ..schemas import UserLogin, UserCreate, Token, SuccessResponse, UserResponse
-from ..auth import authenticate_user, get_current_user, create_access_token, ACCESS_TOKEN_EXPIRE_DAYS, pwd_context
+from ..auth import authenticate_user, hash_password, get_current_user, create_access_token, ACCESS_TOKEN_EXPIRE_DAYS, pwd_context
 from .. import models
 
 import random
@@ -88,10 +88,10 @@ async def login_user(
 
     db.commit()
 
-    # ✅ Fetch the latest IP record from DB (so we return stored values)
+    # Fetch the latest IP record from DB (so we return stored values)
     ip_record = db.query(models.IPAddress).filter(models.IPAddress.user_id == user.id).first()
 
-    # ✅ Generate JWT token
+    # Generate JWT token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     token = create_access_token(
         data={
@@ -175,7 +175,7 @@ async def admin_change_password(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # ✅ Ensure the user is changing their own password
+    # Ensure the user is changing their own password
     if current_user.email != email:
         raise HTTPException(status_code=403, detail="You can only change your own password")
 
@@ -189,7 +189,7 @@ async def admin_change_password(
     if new_password != confirm_password:
         raise HTTPException(status_code=400, detail="New password and confirm password do not match")
 
-    # ✅ Update the password
+    # Update the password
     user.password_hash = pwd_context.hash(new_password)
     db.commit()
 
@@ -242,22 +242,3 @@ async def reset_password(
     db.commit()
     
     return {"message": "Your password has been changed successfully. Please log in with the new password."}
-  
-
-@router.post("/users")
-
-@router.post("/users/{camera_id}")
-
-@router.post("/alerts")
-
-@router.post("/alerts/{alert_id}")
-
-@router.post("/alerts/{alert_id}/status")
-
-@router.post("/super-admin/login")
-
-@router.post("/super-admin/admins")
-
-@router.post("/super-admin/password/forgot/send-otp")
-
-@router.post("/super-admin/password/reset")
