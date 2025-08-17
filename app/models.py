@@ -94,6 +94,28 @@ class IPAddress(Base):
     last_login = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class Camera_details(Base):
+    __tablename__ = 'camera_details'
+    
+    id = Column(Integer, primary_key=True)
+    name = Column(String)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # Optional FK
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)  # Optional FK
+    camera_ip = Column(String, nullable=True)
+    mac_address = Column(String, nullable=True)
+    location = Column(String, nullable=True)
+    status = Column(String, nullable=True)
+    port = Column(String, nullable=True)
+    username = Column(String, nullable=True)
+    password_hash = Column(String, nullable=True)
+    stream_url = Column(String, nullable=True)
+    resolution = Column(String, nullable=True)
+    features = Column(String, nullable=True)
+    last_active = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow) 
+
+
 class WireGuardConfig(Base):
     __tablename__ = "wireguard_configs"
 

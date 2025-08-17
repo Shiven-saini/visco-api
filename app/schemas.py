@@ -80,3 +80,15 @@ class WireGuardServerStatus(BaseModel):
     active_peers: int
     available_ips: int
     total_configs: int
+
+
+class CameraConfigSchema(BaseModel):
+    name: str
+    # user_id: int
+    # org_id: int
+    c_ip: str
+    status: str
+    port: int
+    stream_url: str
+    username: str
+    password: str
