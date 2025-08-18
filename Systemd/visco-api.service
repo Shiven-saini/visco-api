@@ -1,0 +1,23 @@
+[Unit]
+Description=Visco API Service
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ec2-user
+Group=ec2-user
+WorkingDirectory=/home/ec2-user/visco-api
+ExecStart=uv run run.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=visco-api
+
+# Environment variables (add as needed)
+# Environment=PYTHONPATH=/home/ec2-user/visco-api
+# Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
