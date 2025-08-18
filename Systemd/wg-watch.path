@@ -1,0 +1,8 @@
+[Unit]
+Description=Trigger wg-watch.service when wg0.conf changes
+
+[Path]
+PathChanged=/etc/wireguard/wg0.conf
+
+[Install]
+WantedBy=multi-user.target

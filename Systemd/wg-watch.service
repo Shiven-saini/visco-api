@@ -1,0 +1,15 @@
+[Unit]
+Description=Watch WireGuard config and sync on changes
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c '\
+    cd /etc/wireguard && \
+    logger "[wg-watch] Change detected in wg0.conf — starting sync"; \
+    if wg addconf wg0 <(wg-quick strip wg0); then \
+        logger "[wg-watch] WireGuard config synced successfully"; \
+    else \
+        logger "[wg-watch] ERROR: Failed to sync WireGuard config"; \
+    fi'
+Restart=on-failure
