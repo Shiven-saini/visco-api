@@ -12,7 +12,7 @@ import random
 from ..utils.otp_utils import send_email_otp_for_verification, send_email_otp, otp_storage
 from ..utils.token_utils import get_client_ip
 
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 720
 
 router = APIRouter(prefix="/alerts", tags=["Alerts Management"])
 
