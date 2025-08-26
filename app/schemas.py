@@ -1,6 +1,7 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional
-from datetime import datetime
+from typing import List,Optional,Dict
+from datetime import datetime, timedelta, timezone
+from enum import Enum
 
 # User registration schema
 class UserCreate(BaseModel):
@@ -104,4 +105,23 @@ class ManageAlertSchema(BaseModel):
     status : str
 
 class AlertStatusUpdate(BaseModel):
-    status: str    
+    status: str
+
+class SubscriptionCreate(BaseModel):
+    duration_days: int
+    user_id: int
+    user_email: str
+    organization_id: int
+    plan: str
+    status: str
+    start_date: datetime
+    end_date: datetime
+    max_users: int
+    max_cameras: int
+    storage_limit_gb: int
+    storage_limit_days: int
+    price_monthly: Optional[float]
+    features: Optional[Dict] = None
+    price_yearly: Optional[float]
+    active: bool
+       
