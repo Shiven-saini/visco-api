@@ -14,11 +14,11 @@ import random
 from ..utils.otp_utils import send_email_otp_for_verification, send_email_otp, otp_storage
 from ..utils.token_utils import get_client_ip
 
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 720
 
-router = APIRouter(prefix="/auth", tags=["Authentication & Session Management"])
+router = APIRouter(tags=["Authentication & Session Management"])
 
-@router.post("/register-admin")
+@router.post("/admin-register")
 async def register(
     name: str = Form(...),
     email: str = Form(...),
@@ -67,7 +67,7 @@ async def register(
     user.org_id = org.id
 
     db.commit()
-    return {"msg": "Admin registered and organization created successfully."}
+    return {"msg": "Admin registered and organization created successfully.","user_id" : user.id,"org_id":user.org_id,"email":user.email}
 
 @router.post("/login")
 async def login_user(
@@ -159,7 +159,7 @@ async def login_user(
         "last_login": ip_record.last_login,
     }
 
-@router.post("/otp/send-verification")
+@router.post("/send-otp-account-verification")
 async def send_otp_verification_account(
     email: EmailStr = Form(...),
     db: Session = Depends(get_db)
@@ -184,7 +184,7 @@ async def send_otp_verification_account(
     else:
         raise HTTPException(status_code=500, detail=result.get("message", "Failed to send OTP"))
 
-@router.post("/otp/verify")
+@router.post("/verify-your-account")
 async def verify_your_account(
     email: EmailStr = Form(...),
     otp: int = Form(...),
@@ -207,7 +207,7 @@ async def verify_your_account(
 
     return {"message": "OTP verified successfully. You can now proceed to sign up."}
 
-@router.put("/password/change", response_model=SuccessResponse)
+@router.put("/admin-change-password", response_model=SuccessResponse)
 async def admin_change_password(
     email: EmailStr = Form(...),
     old_password: str = Form(...),
@@ -236,7 +236,7 @@ async def admin_change_password(
 
     return {"message": "Password changed successfully"}
 
-@router.post("/password/forgot/send-otp")
+@router.post("/admin-send-otp-forgot-password")
 async def admin_send_otp_forgot_pass(
     email: EmailStr = Form(...),
     db: Session = Depends(get_db)
@@ -260,7 +260,7 @@ async def admin_send_otp_forgot_pass(
         else:
             raise HTTPException(status_code=500, detail=result["message"])
 
-@router.put("/password/reset")
+@router.put("/reset-password")
 async def reset_password(
     otp: int = Form(...),
     password: str = Form(...),
