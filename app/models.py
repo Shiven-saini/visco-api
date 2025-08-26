@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, func, DECIMAL, JSON
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import JSONB
@@ -134,6 +134,33 @@ class Manage_Alert(Base):
     status = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow) 
+
+class Subscription(Base):
+    __tablename__ = "subscriptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    plan = Column(String, nullable=False, default="trial")   # trial/basic/pro/enterprise
+    status = Column(String, nullable=False, default="active") # active/cancelled/past_due/expired
+    start_date = Column(DateTime(timezone=True), server_default=func.now())
+    end_date = Column(DateTime(timezone=True))
+    trial_end_date = Column(DateTime(timezone=True))
+    max_users = Column(Integer, default=5)
+    max_cameras = Column(Integer, default=10)
+    storage_limit_gb = Column(Integer, default=50)
+    storage_limit_days = Column(Integer,nullable=True)
+    price_monthly = Column(DECIMAL(10, 2))
+    price_yearly = Column(DECIMAL(10, 2))
+    stripe_customer_id = Column(String, index=True)
+    stripe_subscription_id = Column(String, index=True)
+    stripe_payment_method_id = Column(String, index=True)
+    stripe_price_id = Column(String, index=True)
+    features = Column(JSON, nullable=False, default={})
+    description = Column(String)
+    active = Column(Boolean, default=True)
+    created_date = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now()) 
 
 
 class WireGuardConfig(Base):
