@@ -3,7 +3,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 # Database configuration
-DATABASE_URL = "postgresql+psycopg://shiven:Shiven%40123@127.0.0.1:5432/visco"
+DATABASE_URL = "postgresql+psycopg://visco_cctv:Visco%400408@127.0.0.1:5432/visco"
 
 # Create SQLAlchemy engine
 engine = create_engine(DATABASE_URL)
