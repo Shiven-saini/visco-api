@@ -89,10 +89,27 @@ class CameraConfigSchema(BaseModel):
     # org_id: int
     c_ip: str
     status: str
-    port: int
+    port: int  # This is the external port for VPN access
     stream_url: str
     username: str
     password: str
+
+# New schema for camera stream response
+class CameraStreamResponse(BaseModel):
+    id: int
+    name: str
+    camera_ip: str
+    port: Optional[str] = None  # External port for VPN access
+    stream_url: str
+    vpn_stream_url: str  # The transformed URL with WireGuard IP
+    status: str
+    location: Optional[str] = None
+    resolution: Optional[str] = None
+    features: Optional[str] = None
+    last_active: Optional[str] = None
+
+    class Config:
+        from_attributes = True
 
 class ManageAlertSchema(BaseModel):
     user_id : int
@@ -124,4 +141,3 @@ class SubscriptionCreate(BaseModel):
     features: Optional[Dict] = None
     price_yearly: Optional[float]
     active: bool
-       
