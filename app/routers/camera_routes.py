@@ -6,7 +6,8 @@ from typing import List
 import re
 from ..database import get_db
 from ..schemas import UserLogin, UserCreate, Token, SuccessResponse, UserResponse, CameraConfigSchema, CameraStreamResponse
-from ..auth import get_current_user, create_access_token, ACCESS_TOKEN_EXPIRE_DAYS, pwd_context
+from ..auth import get_current_user, create_access_token, pwd_context
+from ..config.settings import settings
 from ..services.wireguard_service import WireGuardService
 from .. import models
 
@@ -14,8 +15,6 @@ import random
 
 from ..utils.otp_utils import send_email_otp_for_verification, send_email_otp, otp_storage
 from ..utils.token_utils import get_client_ip
-
-ACCESS_TOKEN_EXPIRE_MINUTES = 720
 
 router = APIRouter(prefix="/cameras", tags=["Camera Management"])
 wg_service = WireGuardService()

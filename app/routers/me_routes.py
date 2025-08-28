@@ -4,15 +4,14 @@ from datetime import timedelta, datetime
 from pydantic import EmailStr
 from ..database import get_db
 from ..schemas import UserLogin, UserCreate, Token, SuccessResponse, UserResponse
-from ..auth import get_current_user, create_access_token, ACCESS_TOKEN_EXPIRE_DAYS, pwd_context
+from ..auth import get_current_user, create_access_token, pwd_context
+from ..config.settings import settings
 from .. import models
 
 import random
 
 from ..utils.otp_utils import send_email_otp_for_verification, send_email_otp, otp_storage
 from ..utils.token_utils import get_client_ip
-
-ACCESS_TOKEN_EXPIRE_MINUTES = 720
 
 router = APIRouter(prefix="/me", tags=["Profile Detail Management"])
 

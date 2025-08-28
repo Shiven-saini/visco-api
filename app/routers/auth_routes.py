@@ -6,15 +6,14 @@ from pydantic import EmailStr
 from typing import Annotated
 from ..database import get_db
 from ..schemas import UserLogin, UserCreate, Token, SuccessResponse, UserResponse
-from ..auth import hash_password, get_current_user, create_access_token, ACCESS_TOKEN_EXPIRE_DAYS, pwd_context, oauth2_scheme
+from ..auth import hash_password, get_current_user, create_access_token, pwd_context, oauth2_scheme
+from ..config.settings import settings
 from .. import models
 
 import random
 
 from ..utils.otp_utils import send_email_otp_for_verification, send_email_otp, otp_storage
 from ..utils.token_utils import get_client_ip
-
-ACCESS_TOKEN_EXPIRE_MINUTES = 720
 
 router = APIRouter(tags=["Authentication & Session Management"])
 
@@ -132,7 +131,7 @@ async def login_user(
     db.refresh(ip_record)
 
     # Create JWT
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
     token = create_access_token(
         data={
             "sub": str(user.id),

@@ -4,15 +4,14 @@ from datetime import timedelta, datetime
 from pydantic import EmailStr
 from ..database import get_db
 from ..schemas import UserLogin, UserCreate, Token, SuccessResponse, UserResponse
-from ..auth import get_current_user, get_current_super_admin, create_access_token, ACCESS_TOKEN_EXPIRE_DAYS, pwd_context
+from ..auth import get_current_user, get_current_super_admin, create_access_token, pwd_context
+from ..config.settings import settings
 from .. import models
 
 import random
 
 from ..utils.otp_utils import send_email_otp_for_verification, send_email_otp, otp_storage
 from ..utils.token_utils import get_client_ip
-
-ACCESS_TOKEN_EXPIRE_MINUTES = 720
 
 router = APIRouter(prefix="/super-admin", tags=["Super Admin Management"])
 
@@ -32,7 +31,7 @@ async def super_admin_login(
         raise HTTPException(status_code=400, detail="Invalid email or password")
 
     # Generate JWT token
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
     token = create_access_token(
         data={"sub": str(super_admin.id),"type": str(super_admin.role), "email": super_admin.email,"role":super_admin.role},
         expires_delta=access_token_expires

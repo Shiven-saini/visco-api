@@ -7,7 +7,7 @@ from ..config.settings import settings
 class IPManager:
     def __init__(self):
         self.subnet = ipaddress.IPv4Network(settings.wg_subnet)
-        self.server_ip = ipaddress.IPv4Address(settings.wg_server_ip)
+        self.server_ip = ipaddress.IPv4Address(settings.wg_server_ip_internal)
         self.client_start_ip = ipaddress.IPv4Address(settings.wg_client_start_ip)
     
     def get_allocated_ips(self, db: Session) -> List[str]:

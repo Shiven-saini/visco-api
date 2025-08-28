@@ -75,13 +75,16 @@ class WireGuardService:
     
     def generate_client_config_content(self, wg_config: WireGuardConfig) -> str:
         """Generate the WireGuard client configuration file content."""
+        # Construct endpoint from IP and port for flexibility
+        endpoint = f"{settings.wg_server_ip}:{settings.wg_server_port}"
+        
         config_content = f"""[Interface]
 PrivateKey = {wg_config.private_key}
 Address = {wg_config.allocated_ip}
 
 [Peer]
 PublicKey = {settings.wg_server_public_key}
-Endpoint = {settings.wg_server_endpoint}
+Endpoint = {endpoint}
 AllowedIPs = {settings.wg_server_allowed_ips}
 PersistentKeepalive = {settings.wg_persistent_keepalive}
 """

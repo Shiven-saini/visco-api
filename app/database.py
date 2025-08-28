@@ -1,12 +1,10 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from .config.settings import settings
 
-# Database configuration
-DATABASE_URL = "postgresql+psycopg://visco_cctv:Visco%400408@127.0.0.1:5432/visco"
-
-# Create SQLAlchemy engine
-engine = create_engine(DATABASE_URL)
+# Create SQLAlchemy engine using settings
+engine = create_engine(settings.database_url)
 
 # Create SessionLocal class
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

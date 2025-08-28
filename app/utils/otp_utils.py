@@ -3,21 +3,15 @@ import random
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import ssl
+from ..config.settings import settings
 
 
 # Setup dotenv
 otp_storage = {}
-EMAIL_USERNAME = "enquiry@upskillcampus.com"
-EMAIL_PASSWORD = "!qZfD}w$FSvR"
-SMTP_SERVER = "mail.upskillcampus.com"
-SMTP_PORT = 465 # 587 for TLS
-
-
-# TODO : SHIVEN-SAINI : SETUP DOTENV FOR UTILS
 def send_email_otp_for_verification(email: str, otp: str):
     try:
         msg = MIMEMultipart()
-        msg["From"] = EMAIL_USERNAME
+        msg["From"] = settings.email_username
         msg["To"] = email
         msg["Subject"] = "OTP For Verification Account | CCTV AI"
 
@@ -40,11 +34,11 @@ support@cctvai_vision.com
         # Create SSL context
         context = ssl.create_default_context()
 
-        with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, context=context) as server:
-            server.login(EMAIL_USERNAME, EMAIL_PASSWORD)  # Authenticate
+        with smtplib.SMTP_SSL(settings.smtp_server, settings.smtp_port, context=context) as server:
+            server.login(settings.email_username, settings.email_password)  # Authenticate
 
             # Send email and check if successful
-            result = server.sendmail(EMAIL_USERNAME, email, msg.as_string())
+            result = server.sendmail(settings.email_username, email, msg.as_string())
             if result == {}:
                 return {"status": "success", "message": "OTP sent successfully"}
             else:
@@ -59,7 +53,7 @@ def send_email_otp(
         ):
     try:
         msg = MIMEMultipart()
-        msg["From"] = EMAIL_USERNAME
+        msg["From"] = settings.email_username
         msg["To"] = email
         msg["Subject"] = "OTP For Reset Password | CCTV AI"
 
@@ -88,10 +82,10 @@ def send_email_otp(
         # Create SSL context
         context = ssl.create_default_context()
 
-        with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, context=context) as server:
-            server.login(EMAIL_USERNAME, EMAIL_PASSWORD)  # Authenticate
+        with smtplib.SMTP_SSL(settings.smtp_server, settings.smtp_port, context=context) as server:
+            server.login(settings.email_username, settings.email_password)  # Authenticate
 
-            if server.sendmail(EMAIL_USERNAME, email, msg.as_string()) == {}:
+            if server.sendmail(settings.email_username, email, msg.as_string()) == {}:
                 
                 return {"status": "success", "message": "OTP sent successfully"}
             else:
