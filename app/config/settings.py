@@ -24,7 +24,6 @@ class Settings(BaseSettings):
     
     # WireGuard Server Constants
     wg_server_public_key: str
-    wg_server_endpoint: str
     wg_server_ip: str
     wg_server_port: str
     wg_server_allowed_ips: str
@@ -48,5 +47,10 @@ class Settings(BaseSettings):
         """Generate the database URL with properly encoded password."""
         encoded_password = quote_plus(self.db_password)
         return f"postgresql+psycopg://{self.db_user}:{encoded_password}@{self.db_host}:{self.db_port}/{self.db_name}"
+    
+    @property
+    def wg_server_endpoint(self) -> str:
+        """Generate the WireGuard server endpoint from IP and port."""
+        return f"{self.wg_server_ip}:{self.wg_server_port}"
 
 settings = Settings()
