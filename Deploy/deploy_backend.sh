@@ -143,9 +143,71 @@ fetch_public_ip() {
     return 1
 }
 
+# Function to update .env file with public IP
+update_env_with_public_ip() {
+    print_step "Step 2: Updating .env file with server public IP..."
+    
+    local public_ip=""
+    if [[ -f "/tmp/server_public_ip.txt" ]]; then
+        public_ip=$(cat /tmp/server_public_ip.txt)
+        print_status "Using fetched public IP: $public_ip"
+    else
+        print_error "Public IP not found in temporary file"
+        return 1
+    fi
+    
+    local env_file="../.env"
+    
+    # Check if .env file exists
+    if [[ ! -f "$env_file" ]]; then
+        print_error ".env file not found: $env_file"
+        print_error "Please ensure the .env file exists in the project root"
+        return 1
+    fi
+    
+    # Create backup of .env file
+    local backup_file="${env_file}.backup.$(date +%Y%m%d_%H%M%S)"
+    print_status "Creating backup of .env file..."
+    if cp "$env_file" "$backup_file"; then
+        print_success "Backup created: $backup_file"
+    else
+        print_warning "Failed to create backup, proceeding anyway..."
+    fi
+    
+    # Update WG_SERVER_IP in .env file
+    print_status "Updating WG_SERVER_IP in .env file..."
+    
+    # Check if WG_SERVER_IP exists in the file
+    if grep -q "^WG_SERVER_IP=" "$env_file"; then
+        # Update existing WG_SERVER_IP
+        if sed -i "s/^WG_SERVER_IP=.*/WG_SERVER_IP=$public_ip/" "$env_file"; then
+            print_success "Updated existing WG_SERVER_IP=$public_ip"
+        else
+            print_error "Failed to update WG_SERVER_IP in .env file"
+            return 1
+        fi
+    else
+        # Add WG_SERVER_IP if it doesn't exist
+        echo "" >> "$env_file"
+        echo "# WireGuard Server IP (auto-updated by deployment script)" >> "$env_file"
+        echo "WG_SERVER_IP=$public_ip" >> "$env_file"
+        print_success "Added WG_SERVER_IP=$public_ip to .env file"
+    fi
+    
+    # Verify the update
+    local updated_ip=$(grep "^WG_SERVER_IP=" "$env_file" | cut -d'=' -f2)
+    if [[ "$updated_ip" == "$public_ip" ]]; then
+        print_success "Successfully updated .env file with server public IP"
+        print_status "Current WG_SERVER_IP setting: $updated_ip"
+    else
+        print_error "Failed to verify .env file update"
+        return 1
+    fi
+}
+
 # Function to copy systemd files
 copy_systemd_files() {
-    print_step "Step 2: Installing systemd service files..."
+    print_step "Step 3: Installing systemd service files..."
     
     local systemd_dir="../Systemd"
     local target_dir="/etc/systemd/system"
@@ -190,7 +252,7 @@ copy_systemd_files() {
 
 # Function to install WireGuard update script
 install_wg_script() {
-    print_step "Step 3: Installing WireGuard configuration script..."
+    print_step "Step 4: Installing WireGuard configuration script..."
     
     local source_script="../Scripts/update_wg_config.sh"
     local target_script="/usr/local/bin/update_wg_config.sh"
@@ -247,7 +309,7 @@ install_wg_script() {
 
 # Function to configure sudo privileges for WireGuard script
 configure_sudo_privileges() {
-    print_step "Step 4: Configuring sudo privileges for WireGuard script..."
+    print_step "Step 5: Configuring sudo privileges for WireGuard script..."
     
     # Get the actual username
     local username=$(get_actual_username)
@@ -298,7 +360,7 @@ configure_sudo_privileges() {
 
 # Function to start systemd services
 start_services() {
-    print_step "Step 5: Starting systemd services..."
+    print_step "Step 6: Starting systemd services..."
     
     local services=("visco-api" "wg-watch.path" "wg-watch.service")
     local started_services=()
@@ -364,12 +426,13 @@ show_deployment_summary() {
     fi
     
     echo
-    print_success "🎉 Backend deployment completed successfully!"
+    print_success "Backend deployment completed successfully!"
     echo
     print_status "=== Deployment Summary ==="
     
     if [[ -n "$public_ip" ]]; then
         print_status "Server Public IP: $public_ip"
+        print_status ".env file updated with WG_SERVER_IP: $public_ip"
     fi
     
     print_status "Systemd services installed and started:"
@@ -392,21 +455,32 @@ show_deployment_summary() {
     print_status "   sudo journalctl -u visco-api -f"
     
     if [[ -n "$public_ip" ]]; then
-        print_status "3. Test API endpoint (adjust port as needed):"
-        print_status "   curl http://$public_ip:8000/"
+        print_status "3. Access FastAPI documentation:"
+        print_status "   http://$public_ip:8086/docs"
+        print_status ""
+        print_status "4. Test basic API endpoint:"
+        print_status "   curl http://$public_ip:8086/"
     fi
     
-    print_status "4. Monitor WireGuard configuration updates:"
+    print_status "5. Monitor WireGuard configuration updates:"
     print_status "   sudo journalctl -u wg-watch -f"
     
     echo
     print_success "Deployment completed! Your Visco API backend is now running."
+    
+    if [[ -n "$public_ip" ]]; then
+        echo
+        print_status "========================================="
+        print_success "API Documentation Available At:"
+        print_success "   http://$public_ip:8086/docs"
+        print_status "========================================="
+    fi
 }
 
 # Main function
 main() {
     echo "================================================"
-    echo "🚀 Visco API Backend Deployment Script"
+    echo "Visco API Backend Deployment Script"
     echo "================================================"
     echo
     
@@ -414,6 +488,7 @@ main() {
     check_sudo || exit 1
     ask_confirmation || exit 1
     fetch_public_ip || exit 1
+    update_env_with_public_ip || exit 1
     copy_systemd_files || exit 1
     install_wg_script || exit 1
     configure_sudo_privileges || exit 1
@@ -424,7 +499,7 @@ main() {
     # Cleanup temporary files
     rm -f /tmp/server_public_ip.txt
     
-    print_success "🎯 Backend deployment script completed successfully!"
+    print_success "Backend deployment script completed successfully!"
 }
 
 # Trap to cleanup on exit
