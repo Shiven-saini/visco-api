@@ -42,6 +42,34 @@ class Token(BaseModel):
     token_type: str
     expires_in: int
 
+# Session schemas
+class SessionResponse(BaseModel):
+    session_id: str
+    device_info: Optional[str] = None
+    ip_address: Optional[str] = None
+    created_at: datetime
+    last_activity: datetime
+    expires_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class ActiveSessionsResponse(BaseModel):
+    active_sessions_count: int
+    sessions: List[SessionResponse]
+
+class LoginResponse(BaseModel):
+    message: str
+    access_token: str
+    token_type: str
+    session_id: str
+    user: dict
+    ip_address: Optional[str] = None
+    last_login: Optional[datetime] = None
+
+class LogoutResponse(BaseModel):
+    message: str
+
 # Standard API response schemas
 class SuccessResponse(BaseModel):
     success: bool = True

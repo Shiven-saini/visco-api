@@ -6,7 +6,7 @@ from pydantic import EmailStr
 from typing import Annotated
 from ..database import get_db
 from ..schemas import UserLogin, UserCreate, Token, SuccessResponse, UserResponse
-from ..auth import hash_password, get_current_user, create_access_token, pwd_context, oauth2_scheme
+from ..auth import hash_password, get_current_user, create_access_token, pwd_context, oauth2_scheme, create_user_session, invalidate_user_session
 from ..config.settings import settings
 from .. import models
 
@@ -71,6 +71,7 @@ async def register(
 @router.post("/login")
 async def login_user(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    request: Request,
     db: Session = Depends(get_db),
 ):
 
@@ -107,8 +108,19 @@ async def login_user(
             detail="Invalid email or password",
         )
 
-    # Update or create IP record
+    # Get device info and IP
     client_ip = get_client_ip()
+    user_agent = request.headers.get("user-agent", "Unknown Device")
+    
+    # Create new session (this will invalidate all previous sessions for this user)
+    session_id = create_user_session(
+        db=db, 
+        user_id=user.id, 
+        ip_address=client_ip, 
+        device_info=user_agent
+    )
+
+    # Update or create IP record (keeping existing functionality)
     ip_record = (
         db.query(models.IPAddress)
         .filter(models.IPAddress.user_id == user.id)
@@ -130,7 +142,7 @@ async def login_user(
     db.refresh(user)
     db.refresh(ip_record)
 
-    # Create JWT
+    # Create JWT with session_id
     access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
     token = create_access_token(
         data={
@@ -138,15 +150,17 @@ async def login_user(
             "type": str(user.role.name),
             "email": user.email,
             "org_id": user.org_id,
+            "session_id": session_id,  # Add session_id to token
         },
         expires_delta=access_token_expires,
     )
 
     # IMPORTANT: keep these keys for Swagger UI
     return {
-        "message": "Login successful",
+        "message": "Login successful. Previous sessions have been logged out.",
         "access_token": token,
         "token_type": "bearer",
+        "session_id": session_id,
         "user": {
             "id": user.id,
             "name": user.name,
@@ -258,6 +272,90 @@ async def admin_send_otp_forgot_pass(
             return {"message": "OTP sent successfully"}
         else:
             raise HTTPException(status_code=500, detail=result["message"])
+
+@router.post("/logout")
+async def logout_user(
+    current_user: models.User = Depends(get_current_user),
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
+):
+    """Logout current user by invalidating their session"""
+    try:
+        from jose import jwt
+        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        session_id = payload.get("session_id")
+        
+        if session_id and invalidate_user_session(db, session_id):
+            return {"message": "Successfully logged out"}
+        else:
+            raise HTTPException(status_code=400, detail="Failed to logout")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid token or session")
+
+@router.post("/logout-all-devices")
+async def logout_all_devices(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Logout user from all devices by invalidating all their sessions"""
+    # Invalidate all active sessions for this user
+    updated_count = db.query(models.UserSession).filter(
+        models.UserSession.user_id == current_user.id,
+        models.UserSession.is_active == True
+    ).update({"is_active": False})
+    
+    db.commit()
+    
+    return {"message": f"Successfully logged out from all devices. {updated_count} sessions invalidated."}
+
+@router.get("/active-sessions")
+async def get_active_sessions(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get all active sessions for the current user"""
+    sessions = db.query(models.UserSession).filter(
+        models.UserSession.user_id == current_user.id,
+        models.UserSession.is_active == True,
+        models.UserSession.expires_at > datetime.utcnow()
+    ).all()
+    
+    session_data = []
+    for session in sessions:
+        session_data.append({
+            "session_id": session.session_id,
+            "device_info": session.device_info,
+            "ip_address": session.ip_address,
+            "created_at": session.created_at,
+            "last_activity": session.last_activity,
+            "expires_at": session.expires_at
+        })
+    
+    return {
+        "active_sessions_count": len(session_data),
+        "sessions": session_data
+    }
+
+@router.delete("/session/{session_id}")
+async def terminate_session(
+    session_id: str,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Terminate a specific session (can only terminate your own sessions)"""
+    session = db.query(models.UserSession).filter(
+        models.UserSession.session_id == session_id,
+        models.UserSession.user_id == current_user.id,
+        models.UserSession.is_active == True
+    ).first()
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found or already inactive")
+    
+    session.is_active = False
+    db.commit()
+    
+    return {"message": f"Session {session_id} has been terminated"}
 
 @router.put("/reset-password")
 async def reset_password(

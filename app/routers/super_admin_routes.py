@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Form, Request
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from datetime import timedelta, datetime
 from pydantic import EmailStr
 from ..database import get_db
 from ..schemas import UserLogin, UserCreate, Token, SuccessResponse, UserResponse
-from ..auth import get_current_user, get_current_super_admin, create_access_token, pwd_context
+from ..auth import get_current_user, get_current_super_admin, create_access_token, pwd_context, create_user_session, invalidate_user_session, oauth2_scheme
 from ..config.settings import settings
 from .. import models
 
@@ -17,6 +18,7 @@ router = APIRouter(prefix="/super-admin", tags=["Super Admin Management"])
 
 @router.post('/login')
 async def super_admin_login(
+    request: Request,
     email: EmailStr = Form(...),
     password: str = Form(...),
     db: Session = Depends(get_db),
@@ -30,17 +32,36 @@ async def super_admin_login(
     if not pwd_context.verify(password, super_admin.password_hash):
         raise HTTPException(status_code=400, detail="Invalid email or password")
 
-    # Generate JWT token
+    # Get device info and IP
+    client_ip = get_client_ip()
+    user_agent = request.headers.get("user-agent", "Unknown Device")
+    
+    # Create new session for super admin (using same table but with negative user_id to distinguish)
+    session_id = create_user_session(
+        db=db, 
+        user_id=-super_admin.id,  # Negative ID to distinguish from regular users
+        ip_address=client_ip, 
+        device_info=f"SuperAdmin: {user_agent}"
+    )
+
+    # Generate JWT token with session_id
     access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
     token = create_access_token(
-        data={"sub": str(super_admin.id),"type": str(super_admin.role), "email": super_admin.email,"role":super_admin.role},
+        data={
+            "sub": str(super_admin.id),
+            "type": str(super_admin.role), 
+            "email": super_admin.email,
+            "role": super_admin.role,
+            "session_id": session_id,
+        },
         expires_delta=access_token_expires
     )
 
     return {
-        "message": "Login successful",
+        "message": "Login successful. Previous sessions have been logged out.",
         "access_token": token,
         "token_type": "bearer",
+        "session_id": session_id,
         "user": {
             "id": super_admin.id,
             "name": super_admin.name,
@@ -48,6 +69,25 @@ async def super_admin_login(
             "role": super_admin.role
         }
     }
+
+@router.post('/logout')
+async def super_admin_logout(
+    current_user: models.Super_admin = Depends(get_current_super_admin),
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
+):
+    """Logout current super admin by invalidating their session"""
+    try:
+        from jose import jwt
+        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        session_id = payload.get("session_id")
+        
+        if session_id and invalidate_user_session(db, session_id):
+            return {"message": "Successfully logged out"}
+        else:
+            raise HTTPException(status_code=400, detail="Failed to logout")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid token or session")
 
 @router.get('/admins')
 async def super_admin_see_all_admins(

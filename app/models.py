@@ -185,6 +185,22 @@ class QueueMonitoring(Base):
     processing_status = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+class UserSession(Base):
+    __tablename__ = "user_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String, nullable=False, unique=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    device_info = Column(String, nullable=True)  # User agent, device name, etc.
+    ip_address = Column(String, nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    last_activity = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    
+    # Relationship to user
+    user = relationship("User", foreign_keys=[user_id])
+
 class WireGuardConfig(Base):
     __tablename__ = "wireguard_configs"
 
