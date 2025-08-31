@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, func, DECIMAL, JSON
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, func, DECIMAL, JSON,Numeric,Text
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB,ARRAY
+
 from datetime import datetime
 from .database import Base
 
@@ -162,6 +163,27 @@ class Subscription(Base):
     created_date = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now()) 
 
+
+class QueueMonitoring(Base):
+    __tablename__ = "queue_monitoring"
+
+    id = Column(Integer, primary_key=True, index=True)
+    camera_id = Column(String(50), nullable=False)
+    frame_id = Column(String(100), unique=True, nullable=False)
+    time_stamp = Column(String(25), nullable=True)
+    queue_count = Column(Integer, nullable=True)
+    queue_name = Column(ARRAY(Text), nullable=True)
+    queue_length = Column(ARRAY(Integer), nullable=True)
+    front_person_wt = Column(ARRAY(Integer), nullable=True)
+    average_wt_time = Column(ARRAY(Integer), nullable=True)
+    status = Column(ARRAY(Text), nullable=True)
+    total_people_detected = Column(Integer, nullable=True)
+    people_ids = Column(ARRAY(Integer), nullable=True)
+    queue_assignment = Column(ARRAY(Integer), nullable=True)
+    entry_time = Column(ARRAY(Text), nullable=True)
+    people_wt_time = Column(ARRAY(Integer), nullable=True)
+    processing_status = Column(Integer, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class WireGuardConfig(Base):
     __tablename__ = "wireguard_configs"

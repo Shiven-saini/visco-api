@@ -58,6 +58,41 @@ async def admin_configure_camera(
         "camera_ip": new_camera.camera_ip
     }
 
+@router.get("/get-added-cameras")
+async def get_admin_added_cameras(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    
+    if current_user.role.name not in ["Admin", "Manager", "Viewer"]:
+       raise HTTPException(status_code=403, detail="Only Admins, Managers, or Viewers can view cameras")
+
+    # ✅ Fetch cameras created by the Admin in their organization
+    cameras = db.query(models.Camera_details).filter(
+        models.Camera_details.organization_id == current_user.org_id
+    ).all()
+
+    # ✅ If no cameras found
+    if not cameras:
+        return {"message": "No cameras configured yet."}
+
+    # ✅ Return camera data
+    return {
+        "cameras": [
+            {
+                "camera_id": cam.id,
+                "name": cam.name,
+                "camera_ip": cam.camera_ip,
+                "status": cam.status,
+                "port": cam.port,
+                "stream_url": cam.stream_url,
+                "username": cam.username
+            }
+            for cam in cameras
+        ]
+    }
+
+
 @router.put('/{camera_id}')
 async def admin_update_camera(
     payload: CameraConfigSchema,  # moved above
@@ -371,3 +406,82 @@ async def get_single_camera_stream_for_vpn(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to process camera stream: {str(e)}"
         )
+
+@router.get("/get-queue-details/{camera_name}")
+async def get_single_camera_queue_monitoring(
+    camera_name: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    # ✅ Check role permissions
+    if current_user.role.name not in ["Admin", "Manager", "Viewer"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Only Admins, Managers, or Viewers can view queue details"
+        )
+
+    # ✅ Fetch camera details
+    camera = db.query(models.Camera_details).filter(
+        models.Camera_details.organization_id == current_user.org_id,
+        models.Camera_details.name == camera_name
+    ).first()
+
+    if not camera:
+        raise HTTPException(status_code=404, detail="Camera not found")
+
+    # ✅ Fetch **last 800** queue monitoring records
+    queue_data_list = (
+        db.query(models.QueueMonitoring)
+        .filter(models.QueueMonitoring.camera_id == str(camera.name))
+        .order_by(models.QueueMonitoring.created_at.desc())
+        .limit(800)
+        .all()
+    )
+
+    # ✅ If no data found
+    if not queue_data_list:
+        return {
+            "camera_id": camera.id,
+            "name": camera.name,
+            "camera_ip": camera.camera_ip,
+            "status": camera.status,
+            "port": camera.port,
+            "stream_url": camera.stream_url,
+            "username": camera.username,
+            "queue_details": []
+        }
+
+    # ✅ Format the data in a list
+    queue_details = [
+        {
+            "frame_id": q.frame_id,
+            "time_stamp": q.time_stamp,
+            "queue_count": q.queue_count,
+            "queue_name": q.queue_name,
+            "queue_length": q.queue_length,
+            "front_person_wt": q.front_person_wt,
+            "average_wt_time": q.average_wt_time,
+            "status": q.status,
+            "total_people_detected": q.total_people_detected,
+            "people_ids": q.people_ids,
+            "queue_assignment": q.queue_assignment,
+            "entry_time": q.entry_time,
+            "people_wt_time": q.people_wt_time,
+            "processing_status": q.processing_status,
+            "created_at": q.created_at,
+        }
+        for q in queue_data_list
+    ]
+
+    # ✅ Return camera + last 800 queue monitoring records
+    return {
+        "camera_id": camera.id,
+        "name": camera.name,
+        "camera_ip": camera.camera_ip,
+        "status": camera.status,
+        "port": camera.port,
+        "stream_url": camera.stream_url,
+        "username": camera.username,
+        "queue_details": queue_details
+    }
+       

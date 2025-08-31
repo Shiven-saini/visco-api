@@ -27,20 +27,20 @@ ip_manager = IPManager()
 
 @router.post("/generate-config", response_model=WireGuardClientConfig)
 def generate_wireguard_config(
-    username: Optional[str] = None,
+    email: Optional[str] = None,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Generate WireGuard configuration for the current user or specified username."""
     
     # Determine target user
-    if username:
+    if email:
         # Admin functionality - get config for specified user
-        target_user = db.query(models.User).filter(models.User.username == username).first()
+        target_user = db.query(models.User).filter(models.User.email == email).first()
         if not target_user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"User '{username}' not found"
+                detail=f"User with email address '{email}' not found"
             )
     else:
         # Generate config for current user
