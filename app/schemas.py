@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import List,Optional,Dict
+from typing import List, Optional, Dict
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 
@@ -138,6 +138,48 @@ class CameraStreamResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+# Enhanced VPN status information
+class VPNStatus(BaseModel):
+    has_config: bool
+    is_active: bool
+    is_expired: bool
+    allocated_ip: Optional[str] = None
+    expires_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    status_message: str
+    next_action: Optional[str] = None  # What user should do next
+
+# Enhanced camera stream response with VPN support and edge cases
+class EnhancedCameraStreamResponse(BaseModel):
+    id: int
+    name: str
+    camera_ip: str
+    port: Optional[int] = None  # External port for VPN access
+    stream_url: str
+    vpn_stream_url: Optional[str] = None  # The transformed URL with WireGuard IP
+    local_stream_url: Optional[str] = None  # Fallback local network URL
+    status: str
+    location: Optional[str] = None
+    resolution: Optional[str] = None
+    features: Optional[str] = None
+    last_active: Optional[str] = None
+    
+    # VPN-specific information
+    vpn_status: str  # "available", "unavailable", "inactive", "expired", "not_configured"
+    vpn_connectivity: Optional[str] = None  # "connected", "disconnected", "unknown"
+    error_message: Optional[str] = None
+    troubleshooting_info: Optional[dict] = None
+
+    class Config:
+        from_attributes = True
+
+# Comprehensive camera streams response with VPN status
+class CameraStreamsWithVPNResponse(BaseModel):
+    vpn_status: VPNStatus
+    cameras_count: int
+    cameras: List[EnhancedCameraStreamResponse]
+    available_actions: List[str]  # Available actions user can take
 
 class ManageAlertSchema(BaseModel):
     user_id : int

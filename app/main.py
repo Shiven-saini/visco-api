@@ -147,6 +147,13 @@ app.include_router(super_admin_routes.router)
 app.include_router(subscriptions_and_payment_routes.router)
 app.include_router(wireguard_routes.router)
 
+# Include enhanced camera routes with comprehensive VPN support
+try:
+    from .routers import camera_routes_enhanced
+    app.include_router(camera_routes_enhanced.router)
+except ImportError:
+    logger.warning("Enhanced camera routes not available")
+
 @app.get("/")
 def root():
     return {"message": "Visco Authentication API is running!"}
