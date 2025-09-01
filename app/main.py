@@ -87,7 +87,7 @@ from fastapi.middleware.cors import CORSMiddleware  # Import CORSMiddleware
 from .database import engine
 from sqlalchemy.exc import OperationalError
 from . import models
-from .routers import auth_routes, user_routes, wireguard_routes, me_routes, camera_routes, alerts_routes, super_admin_routes, subscriptions_and_payment_routes
+from .routers import auth_routes, user_routes, wireguard_routes, stream_routes, me_routes, camera_routes, alerts_routes, super_admin_routes, subscriptions_and_payment_routes
 import logging
 
 # Create database tables
