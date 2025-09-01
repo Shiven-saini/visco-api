@@ -211,3 +211,85 @@ class SubscriptionCreate(BaseModel):
     features: Optional[Dict] = None
     price_yearly: Optional[float]
     active: bool
+
+# KVS Stream Management Schemas
+class StreamStartRequest(BaseModel):
+    camera_id: int
+    custom_stream_name: Optional[str] = None  # Optional custom name, will auto-generate if not provided
+
+class StreamStartResponse(BaseModel):
+    stream_id: int
+    stream_name: str
+    kvs_stream_name: str
+    camera_name: str
+    rtsp_url: str
+    status: str
+    message: str
+    
+    class Config:
+        from_attributes = True
+
+class StreamStopRequest(BaseModel):
+    force: bool = False  # Force stop even if process is not responding
+
+class StreamStopResponse(BaseModel):
+    stream_id: int
+    stream_name: str
+    previous_status: str
+    current_status: str
+    message: str
+    
+    class Config:
+        from_attributes = True
+
+class StreamStatusResponse(BaseModel):
+    stream_id: int
+    stream_name: str
+    kvs_stream_name: str
+    user_id: int
+    username: str
+    camera_id: int
+    camera_name: str
+    rtsp_url: str
+    status: str
+    process_id: Optional[int] = None
+    process_status: Optional[str] = None
+    error_message: Optional[str] = None
+    start_time: Optional[datetime] = None
+    stop_time: Optional[datetime] = None
+    last_health_check: Optional[datetime] = None
+    restart_count: int = 0
+    uptime_seconds: Optional[int] = None
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class UserStreamsSummary(BaseModel):
+    user_id: int
+    username: str
+    organization_name: str
+    total_streams: int
+    active_streams: int
+    stopped_streams: int
+    error_streams: int
+    streams: List[StreamStatusResponse]
+
+class StreamBulkOperationResponse(BaseModel):
+    user_id: int
+    operation: str  # start_all, stop_all
+    total_cameras: int
+    successful_operations: int
+    failed_operations: int
+    results: List[dict]  # List of individual operation results
+    errors: List[str]
+
+class StreamHealthCheck(BaseModel):
+    stream_id: int
+    stream_name: str
+    is_healthy: bool
+    process_running: bool
+    last_check: datetime
+    issues: List[str] = []
+    recommendations: List[str] = []

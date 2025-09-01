@@ -154,6 +154,16 @@ try:
 except ImportError:
     logger.warning("Enhanced camera routes not available")
 
+# Include KVS stream management routes
+try:
+    from .routers import stream_routes
+    app.include_router(stream_routes.router)
+    logger.info("KVS Stream Management routes loaded successfully")
+except ImportError as e:
+    logger.warning(f"KVS Stream routes not available: {e}")
+except Exception as e:
+    logger.error(f"Failed to load KVS Stream routes: {e}")
+
 @app.get("/")
 def root():
     return {"message": "Visco Authentication API is running!"}

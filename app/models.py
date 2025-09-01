@@ -216,3 +216,29 @@ class WireGuardConfig(Base):
     
     # Relationship back to user
     user = relationship("User", back_populates="wireguard_config")
+
+class KVSStream(Base):
+    __tablename__ = "kvs_streams"
+
+    id = Column(Integer, primary_key=True, index=True)
+    stream_name = Column(String, nullable=False, unique=True, index=True)  # e.g., "shiven_1", "john_2"
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
+    camera_id = Column(Integer, ForeignKey("camera_details.id"), nullable=False)
+    rtsp_url = Column(String, nullable=False)  # VPN-accessible RTSP URL
+    kvs_stream_name = Column(String, nullable=False)  # AWS KVS stream name
+    status = Column(String, default="stopped")  # stopped, starting, running, error, stopping
+    process_id = Column(Integer, nullable=True)  # System process ID
+    process_status = Column(String, nullable=True)  # Process status details
+    error_message = Column(String, nullable=True)
+    start_time = Column(DateTime(timezone=True), nullable=True)
+    stop_time = Column(DateTime(timezone=True), nullable=True)
+    last_health_check = Column(DateTime(timezone=True), nullable=True)
+    restart_count = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    user = relationship("User", foreign_keys=[user_id])
+    organization = relationship("Organization", foreign_keys=[organization_id])
+    camera = relationship("Camera_details", foreign_keys=[camera_id])
