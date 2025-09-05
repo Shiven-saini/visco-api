@@ -106,14 +106,22 @@ class Camera_details(Base):
     name = Column(String)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # Optional FK
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)  # Optional FK
-    camera_ip = Column(String, nullable=True)
+    
+    # Local camera details (for reference only)
+    camera_ip = Column(String, nullable=True)  # Local camera IP (e.g., 192.168.1.100)
+    camera_port = Column(String, nullable=True)  # Local camera RTSP port (e.g., 554)
+    
+    # WireGuard and external access details (for KVS streaming)
+    wireguard_ip = Column(String, nullable=True)  # WireGuard IP of the device
+    external_port = Column(String, nullable=True)  # External port for forwarding (e.g., 8551)
+    
     mac_address = Column(String, nullable=True)
     location = Column(String, nullable=True)
     status = Column(String, nullable=True)
-    port = Column(String, nullable=True)
+    port = Column(String, nullable=True)  # Keep for backward compatibility, will store external_port
     username = Column(String, nullable=True)
     password_hash = Column(String, nullable=True)
-    stream_url = Column(String, nullable=True)
+    stream_url = Column(String, nullable=True)  # RTSP URL using WireGuard IP and external port
     resolution = Column(String, nullable=True)
     features = Column(String, nullable=True)
     last_active = Column(String, nullable=True)

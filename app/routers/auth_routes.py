@@ -279,17 +279,68 @@ async def logout_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
 ):
-    """Logout current user by invalidating their session"""
+    """Logout current user by invalidating their session and revoking WireGuard config"""
     try:
         from jose import jwt
+        from ..services.wireguard_service import WireGuardService
+        from ..utils.system_utils import remove_peer_from_wg_config
+        
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
         session_id = payload.get("session_id")
         
+        logout_successful = False
+        wireguard_revoked = False
+        wireguard_error = None
+        freed_ip = None
+        
+        # Invalidate user session
         if session_id and invalidate_user_session(db, session_id):
-            return {"message": "Successfully logged out"}
+            logout_successful = True
+        
+        # Revoke WireGuard configuration if exists (using same logic as wireguard delete endpoint)
+        wg_service = WireGuardService()
+        config = wg_service.get_user_config(db, current_user)
+        if config:
+            try:
+                # Store IP before deletion
+                freed_ip = config.allocated_ip
+                
+                # Remove peer from server config (same as wireguard delete endpoint)
+                if not remove_peer_from_wg_config(config.public_key):
+                    wireguard_error = "Failed to remove peer from server WireGuard configuration"
+                    print(f"Failed to remove peer from server config for user {current_user.email}")
+                else:
+                    # Remove from database (same as wireguard delete endpoint)
+                    if wg_service.revoke_config(db, current_user):
+                        wireguard_revoked = True
+                        print(f"WireGuard config revoked for user {current_user.email}, IP {freed_ip} freed")
+                    else:
+                        wireguard_error = "Failed to revoke WireGuard configuration from database"
+                        print(f"Failed to revoke WireGuard config from database for user {current_user.email}")
+                
+            except Exception as wg_error:
+                wireguard_error = f"Error during WireGuard cleanup: {str(wg_error)}"
+                print(f"Error revoking WireGuard config for user {current_user.email}: {wg_error}")
+                # Don't fail the logout if WireGuard cleanup fails
+        
+        if logout_successful:
+            response_data = {"message": "Successfully logged out"}
+            if wireguard_revoked:
+                response_data["wireguard_status"] = "WireGuard configuration revoked and IP freed"
+                response_data["freed_ip"] = freed_ip
+            elif config and wireguard_error:
+                response_data["wireguard_status"] = f"Warning: {wireguard_error}"
+            elif config:
+                response_data["wireguard_status"] = "Warning: WireGuard configuration cleanup failed"
+            else:
+                response_data["wireguard_status"] = "No WireGuard configuration to revoke"
+                
+            return response_data
         else:
             raise HTTPException(status_code=400, detail="Failed to logout")
-    except Exception:
+            
+    except Exception as e:
+        print(f"Logout error for user {current_user.email}: {e}")
         raise HTTPException(status_code=400, detail="Invalid token or session")
 
 @router.post("/logout-all-devices")

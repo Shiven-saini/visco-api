@@ -52,34 +52,46 @@ class KVSStreamService:
     def get_vpn_rtsp_url(self, camera: Camera_details, user: User, db: Session) -> Optional[str]:
         """Get VPN-accessible RTSP URL for camera"""
         try:
-            # Get user's WireGuard config
-            wg_config = self.wg_service.get_user_config(db, user)
-            if not wg_config or wg_config.status != "active":
-                logger.error(f"No active VPN config for user {user.id}")
-                return None
+            # First try to use camera's stored WireGuard IP and external port
+            if camera.wireguard_ip and camera.external_port:
+                vpn_ip = camera.wireguard_ip
+                external_port = camera.external_port
+                logger.info(f"Using stored WireGuard IP {vpn_ip}:{external_port} for camera {camera.id}")
+            else:
+                # Fallback: Get user's WireGuard config
+                wg_config = self.wg_service.get_user_config(db, user)
+                if not wg_config or wg_config.status != "active":
+                    logger.error(f"No active VPN config for user {user.id}")
+                    return None
+                
+                # Check if config is expired
+                if wg_config.expires_at and wg_config.expires_at < datetime.utcnow():
+                    logger.error(f"VPN config expired for user {user.id}")
+                    return None
+                
+                # Get VPN IP from user config
+                vpn_ip = wg_config.allocated_ip.split('/')[0]
+                external_port = camera.port if camera.port else "554"
+                logger.info(f"Using fallback WireGuard IP {vpn_ip}:{external_port} for camera {camera.id}")
             
-            # Check if config is expired
-            if wg_config.expires_at and wg_config.expires_at < datetime.utcnow():
-                logger.error(f"VPN config expired for user {user.id}")
-                return None
-            
-            # Get VPN IP
-            vpn_ip = wg_config.allocated_ip.split('/')[0]
-            
-            # Build RTSP URL
-            external_port = camera.port if camera.port else "554"
+            # Build RTSP URL using WireGuard IP and external port
             credentials = ""
             if camera.username and camera.password_hash:
                 credentials = f"{camera.username}:{camera.password_hash}@"
             
+            # Use camera's stream URL path or default RTSP path
             path = camera.stream_url if camera.stream_url else "/cam/realmonitor?channel=1&subtype=0"
             if not path.startswith('/'):
                 path = f"/{path}"
             
-            return f"rtsp://{credentials}{vpn_ip}:{external_port}{path}"
+            rtsp_url = f"rtsp://{credentials}{vpn_ip}:{external_port}{path}"
+            logger.info(f"Generated RTSP URL for camera {camera.id}: rtsp://{credentials}{vpn_ip}:{external_port}{path}")
+            
+            return rtsp_url
             
         except Exception as e:
             logger.error(f"Error building VPN RTSP URL: {e}")
+            return None
             return None
     
     def start_stream(self, camera_id: int, user: User, db: Session, custom_stream_name: Optional[str] = None) -> Tuple[bool, str, Optional[KVSStream]]:

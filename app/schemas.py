@@ -113,14 +113,22 @@ class WireGuardServerStatus(BaseModel):
 
 class CameraConfigSchema(BaseModel):
     name: str
-    # user_id: int
-    # org_id: int
-    c_ip: str
+    # Local camera details (for reference)
+    camera_ip: str  # Local camera IP (e.g., 192.168.1.100)
+    camera_port: int  # Local camera RTSP port (e.g., 554)
+    
+    # WireGuard and external access details (for KVS streaming)
+    wireguard_ip: str  # WireGuard IP of the device
+    external_port: int  # External port for forwarding (e.g., 8551)
+    
     status: str
-    port: int  # This is the external port for VPN access
-    stream_url: str
+    stream_url: str  # RTSP URL using WireGuard IP and external port
     username: str
     password: str
+
+    # Backward compatibility fields
+    c_ip: Optional[str] = None  # Will map to camera_ip
+    port: Optional[int] = None  # Will map to external_port
 
 # New schema for camera stream response
 class CameraStreamResponse(BaseModel):

@@ -530,3 +530,66 @@ async def cleanup_orphaned_streams(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to cleanup orphaned streams: {str(e)}"
         )
+
+@router.get("/camera/{camera_id}/url")
+async def get_camera_stream_url(
+    camera_id: int = Path(..., description="Camera ID to get stream URL for"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get the RTSP URL for a specific camera for KVS streaming purposes.
+    
+    This endpoint returns the VPN-accessible RTSP URL that can be used
+    by KVS binaries to start streaming from the camera.
+    """
+    try:
+        # Get camera details
+        from .. import models
+        camera = db.query(models.Camera_details).filter(models.Camera_details.id == camera_id).first()
+        if not camera:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Camera with ID {camera_id} not found"
+            )
+        
+        # Check camera access permissions
+        if (current_user.role.name not in ["Admin", "Manager"] and 
+            current_user.id != camera.user_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only access cameras you own or if you're an admin/manager"
+            )
+        
+        # Check organization access
+        if current_user.org_id != camera.organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Camera belongs to a different organization"
+            )
+        
+        # Get VPN RTSP URL using KVS service
+        rtsp_url = kvs_service.get_vpn_rtsp_url(camera, current_user, db)
+        if not rtsp_url:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Unable to generate VPN RTSP URL. Check camera and VPN configuration."
+            )
+        
+        return {
+            "camera_id": camera.id,
+            "camera_name": camera.name,
+            "rtsp_url": rtsp_url,
+            "wireguard_ip": camera.wireguard_ip if camera.wireguard_ip else "from_user_config",
+            "external_port": camera.external_port if camera.external_port else camera.port,
+            "camera_status": camera.status,
+            "message": "Camera stream URL ready for KVS streaming"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get camera stream URL: {str(e)}"
+        )
